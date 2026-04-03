@@ -3,13 +3,13 @@ import { Bell, Sun } from "lucide-react";
 
 export default function Navbar() {
   return (
-    <div className="flex items-center justify-between bg-white p-4 border-b">
+    <div className="flex items-center justify-between bg-white p-4 border-[0.5px] border-gray-200">
       
       {/* Search */}
       <input
         type="text"
         placeholder="Search cases, clients, documents..."
-        className="w-1/3 px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none"
+        className="w-1/3 px-4 py-2 border-[0.5px] border-gray-200 focus:outline-none"
       />
 
       {/* Right Section */}
