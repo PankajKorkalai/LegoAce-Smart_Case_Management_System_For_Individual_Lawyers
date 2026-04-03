@@ -1,6 +1,5 @@
 // components/Sidebar.jsx
 import { NavLink } from "react-router-dom";
-import { useState } from "react";
 import {
   LayoutDashboard,
   Briefcase,
@@ -25,15 +24,21 @@ const menu = [
   { name: "Video Consult", path: "/video", icon: Video },
 ];
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-
+export default function Sidebar({ collapsed, onCollapsedChange }) {
   return (
-    <div className={`${collapsed ? "w-20" : "w-64"} h-screen bg-gray-50 border-r flex flex-col justify-between transition-all duration-300`}>
+    <div
+      className={`fixed left-0 top-0 z-50 flex h-screen flex-col justify-between overflow-y-auto overscroll-y-contain border-r border-gray-200/70 bg-gray-50/90 backdrop-blur-xl backdrop-saturate-150 transition-[width] duration-300 ease-out ${
+        collapsed ? "w-20" : "w-64"
+      }`}
+    >
       
       {/* TOP */}
       <div>
-        <div className="flex items-center justify-between px-4 py-4">
+        <div
+          className={`flex h-14 shrink-0 items-center border-b border-gray-200/60 px-4 ${
+            collapsed ? "justify-center" : "justify-between"
+          }`}
+        >
           {!collapsed && (
             <div className="flex items-center gap-2">
               <div className="bg-green-700 text-white p-2 rounded-lg">
@@ -43,12 +48,16 @@ export default function Sidebar() {
             </div>
           )}
 
-          <button onClick={() => setCollapsed(!collapsed)}>
+          <button
+            type="button"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => onCollapsedChange(!collapsed)}
+          >
             {collapsed ? <ChevronRight /> : <ChevronLeft />}
           </button>
         </div>
 
-        <div className="mt-4 px-2 space-y-1">
+        <div className="mt-3 px-2 space-y-1">
           {menu.map((item) => {
             const Icon = item.icon;
 
@@ -73,7 +82,7 @@ export default function Sidebar() {
       </div>
 
       {/* BOTTOM */}
-      <div className="border-t p-3">
+      <div className="border-t border-gray-200/35 p-3">
         <NavLink
           to="/settings"
           className="flex items-center gap-3 px-3 py-2 rounded-xl text-gray-600 hover:bg-gray-100"
