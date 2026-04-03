@@ -1,9 +1,9 @@
 // App.jsx
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
-import Dashboard from "./pages/Dashboard";
+import AppRoutes from "./routes/AppRoutes";
 
-function App() {
+export default function App() {
   return (
     <div className="flex">
       <Sidebar />
@@ -12,11 +12,9 @@ function App() {
         <Navbar />
 
         <div className="p-6">
-          <Dashboard />
+          <AppRoutes />
         </div>
       </div>
     </div>
   );
 }
-
-export default App;
