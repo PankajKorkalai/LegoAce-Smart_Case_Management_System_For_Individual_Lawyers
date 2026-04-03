@@ -29,7 +29,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className={`${collapsed ? "w-20" : "w-64"} h-screen bg-gray-50 border-r flex flex-col justify-between transition-all duration-300`}>
+    <div className={`${collapsed ? "w-20" : "w-64"} h-screen bg-gray-50 border-[0.5px] border-gray-200 flex flex-col justify-between transition-all duration-300`}>
       
       {/* TOP */}
       <div>
@@ -73,7 +73,7 @@ export default function Sidebar() {
       </div>
 
       {/* BOTTOM */}
-      <div className="border-t p-3">
+      <div className=" p-3">
         <NavLink
           to="/settings"
           className="flex items-center gap-3 px-3 py-2 rounded-xl text-gray-600 hover:bg-gray-100"
