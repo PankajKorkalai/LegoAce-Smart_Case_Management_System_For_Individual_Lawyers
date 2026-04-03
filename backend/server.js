@@ -4,6 +4,10 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+const connectDB = require("./db/db")
+
+connectDB();
+
 const app = express();
 
 // Middleware
