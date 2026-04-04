@@ -12,11 +12,14 @@ import Settings from "../pages/Settings";
 // ❗ optional (only if file exists)
 import AI from "../pages/AI";
 import Profile from "../pages/Profile";
+import { Home } from "lucide-react";
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
+
+      <Route path="/" element={<Home />} />
+      <Route path="/dashy" element={<Dashboard />} />
       <Route path="/cases" element={<Cases />} />
       <Route path="/clients" element={<Clients />} />
       <Route path="/documents" element={<Documents />} />
