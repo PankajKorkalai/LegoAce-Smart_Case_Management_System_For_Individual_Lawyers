@@ -14,6 +14,7 @@ import Settings from "../pages/Settings";
 // ❗ optional (only if file exists)
 import AI from "../pages/AI";
 import Profile from "../pages/Profile";
+import FeedbackPage from "../pages/Feedback";
 
 export default function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export default function AppRoutes() {
       <Route path="/cases" element={<Cases />} />
       <Route path="/clients" element={<Clients />} />
       <Route path="/documents" element={<Documents />} />
+      <Route path="/feedback" element={<FeedbackPage />} />
       <Route path="/calendar" element={<Calendar />} />
       <Route path="/video" element={<Video />} />
       <Route path="/settings" element={<Settings />} />

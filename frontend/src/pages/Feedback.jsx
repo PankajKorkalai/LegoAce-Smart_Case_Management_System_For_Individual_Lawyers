@@ -278,7 +278,7 @@ export default function FeedbackPage() {
             </div>
 
             {/* RATING DISTRIBUTION */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            {/*<div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Rating Distribution</h3>
                 <div className="space-y-2">
                     {[5, 4, 3, 2, 1].map((rating) => {
@@ -301,7 +301,7 @@ export default function FeedbackPage() {
                         );
                     })}
                 </div>
-            </div>
+            </div>*/}
 
             {/* FILTERS */}
             <div className="flex flex-wrap gap-3 items-center justify-between">
