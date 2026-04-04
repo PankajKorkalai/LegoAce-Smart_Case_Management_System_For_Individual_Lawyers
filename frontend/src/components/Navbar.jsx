@@ -9,10 +9,13 @@ import {
   } from "lucide-react";
   
   import { useState, useRef, useEffect } from "react";
+  import { useNavigate } from "react-router-dom";
   
   export default function Navbar() {
     const [showNotif, setShowNotif] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
+  
+    const navigate = useNavigate();
   
     const notifRef = useRef(null);
     const profileRef = useRef(null);
@@ -35,10 +38,10 @@ import {
         }
       }
   
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("click", handleClickOutside);
   
       return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("click", handleClickOutside);
       };
     }, []);
   
@@ -72,6 +75,11 @@ import {
         type: "info",
       },
     ];
+
+    const openprofile=()=>{
+      console.log("Opening profile...");
+      navigate("/profile");
+    }
   
     return (
       <div className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white/65 px-6 backdrop-blur-xl backdrop-saturate-150 supports-backdrop-filter:bg-white/55">
@@ -114,7 +122,7 @@ import {
                 {/* HEADER */}
                 <div className="flex justify-between items-center px-4 py-3 border-b">
                   <h2 className="font-semibold">Notifications</h2>
-                  <button className="text-sm text-green-600 hover:underline">
+                  <button className="text-sm text-green-600">
                     Mark all as read
                   </button>
                 </div>
@@ -179,12 +187,12 @@ import {
               </div>
   
               <div className="p-2 text-sm space-y-1">
-                <button className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100">
+                <button onClick={openprofile} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100">
                   <User size={16} />
-                  View Profile
+                  View Profile 
                 </button>
   
-                <button className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100">
+                <button onClick={()=>navigate("/settings")} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100">
                   <Settings size={16} />
                   Settings
                 </button>
