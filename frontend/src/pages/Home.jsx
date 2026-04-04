@@ -27,7 +27,7 @@ export default function Home() {
           </Link>
           
           <Link
-            to="/auth"
+            to="/login"
             className="flex items-center gap-2 bg-white hover:bg-gray-100 text-green-700 border border-green-700 px-6 py-3 rounded-xl font-medium transition-colors"
           >
             <User size={20} /> Login
