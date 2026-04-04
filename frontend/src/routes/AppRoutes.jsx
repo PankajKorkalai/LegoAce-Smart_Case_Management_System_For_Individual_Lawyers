@@ -11,7 +11,7 @@ import Settings from "../pages/Settings";
 
 // ❗ optional (only if file exists)
 import AI from "../pages/AI";
-import Login from "../pages/Login";
+import Profile from "../pages/Profile";
 
 export default function AppRoutes() {
   return (
@@ -23,6 +23,7 @@ export default function AppRoutes() {
       <Route path="/calendar" element={<Calendar />} />
       <Route path="/video" element={<Video />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/profile" element={<Profile />} />
 
       {/* optional */}
       <Route path="/ai" element={<AI />} />
