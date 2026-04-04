@@ -11,7 +11,8 @@ import {
   Settings,
   Scale,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Star
 } from "lucide-react";
 
 const menu = [
@@ -19,6 +20,7 @@ const menu = [
   { name: "Cases", path: "/cases", icon: Briefcase },
   { name: "Clients", path: "/clients", icon: Users },
   { name: "Documents", path: "/documents", icon: FileText },
+  { name: "Feedback", path: "/feedback", icon: Star },
   { name: "AI Assistant", path: "/ai", icon: MessageSquare },
   { name: "Calendar", path: "/calendar", icon: Calendar },
   { name: "Video Consult", path: "/video", icon: Video },
