@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 const menu = [
-  { name: "Dashboard", path: "/", icon: LayoutDashboard },
+  { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { name: "Cases", path: "/cases", icon: Briefcase },
   { name: "Clients", path: "/clients", icon: Users },
   { name: "Documents", path: "/documents", icon: FileText },

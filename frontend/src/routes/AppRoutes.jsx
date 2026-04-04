@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 
 // ✅ correct paths (../pages)
+import Home from "../pages/Home";
 import Dashboard from "../pages/Dashboard";
 import Cases from "../pages/Cases";
 import Clients from "../pages/Clients";
@@ -16,7 +17,8 @@ import Profile from "../pages/Profile";
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/cases" element={<Cases />} />
       <Route path="/clients" element={<Clients />} />
       <Route path="/documents" element={<Documents />} />
