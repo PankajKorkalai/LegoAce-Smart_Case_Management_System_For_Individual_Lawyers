@@ -114,7 +114,7 @@ import {
                 {/* HEADER */}
                 <div className="flex justify-between items-center px-4 py-3 border-b">
                   <h2 className="font-semibold">Notifications</h2>
-                  <button className="text-sm text-green-600 hover:underline">
+                  <button className="text-sm text-green-600">
                     Mark all as read
                   </button>
                 </div>
