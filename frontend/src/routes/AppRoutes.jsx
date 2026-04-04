@@ -11,6 +11,7 @@ import Settings from "../pages/Settings";
 
 // ❗ optional (only if file exists)
 import AI from "../pages/AI";
+import Login from "../pages/Login";
 
 export default function AppRoutes() {
   return (
