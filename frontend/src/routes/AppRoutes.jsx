@@ -10,6 +10,7 @@ import Calendar from "../pages/Calendar";
 import Video from "../pages/Video";
 import Settings from "../pages/Settings";
 
+
 // ❗ optional (only if file exists)
 import AI from "../pages/AI";
 import Profile from "../pages/Profile";
