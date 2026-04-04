@@ -74,12 +74,29 @@ Vite will print a local URL, usually:
 
 ## Environment Variables
 
-Create a `.env` file inside `backend/` when you add environment-specific settings (for example `PORT`).
+Create a `.env` file inside `backend/` when you add environment-specific settings.
 
-Example:
+Copy `backend/.env.example` to `backend/.env` and fill in your values:
 
 ```env
 PORT=5000
+MONGO_URL=your_mongo_connection_string
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+For the frontend, copy `frontend/.env.example` to `frontend/.env` if you need a custom backend URL:
+
+```env
+VITE_API_URL=http://localhost:5000
+```
+
+Then install backend dependencies and start the server in `backend/`:
+
+```bash
+npm install
+npm run dev
 ```
 
 ## Notes

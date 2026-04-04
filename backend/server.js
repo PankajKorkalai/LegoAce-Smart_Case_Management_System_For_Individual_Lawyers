@@ -4,7 +4,8 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const connectDB = require("./db/db")
+const connectDB = require("./db/db");
+const uploadRouter = require("./routes/upload");
 
 connectDB();
 
@@ -18,6 +19,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("Backend running with CommonJS 🚀");
 });
+
+app.use("/api", uploadRouter);
 
 const PORT = process.env.PORT || 5000;
 

@@ -1,3 +1,4 @@
+﻿import { useRef, useState } from "react";
 import {
   Search,
   Upload,
@@ -8,7 +9,7 @@ import {
   Grid,
 } from "lucide-react";
 
-const documents = [
+const initialDocuments = [
   {
     name: "Initial Complaint - Smith vs Johnson.pdf",
     id: "DOC-001",
@@ -44,13 +45,77 @@ const documents = [
 const typeColor = {
   "Legal Filing": "bg-green-100 text-green-700",
   Evidence: "bg-blue-100 text-blue-700",
+  "Uploaded Document": "bg-gray-100 text-gray-700",
 };
 
+const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function Documents() {
+  const [documents, setDocuments] = useState(initialDocuments);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const fileInputRef = useRef(null);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadMessage("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Upload failed");
+      }
+
+      const newDocument = {
+        name: file.name,
+        id: `DOC-${Date.now()}`,
+        type: "Uploaded Document",
+        case: "Unassigned",
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        status: "processed",
+        uploaded: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+        author: "You",
+        url: data.secure_url,
+      };
+
+      setDocuments((prev) => [newDocument, ...prev]);
+      setUploadMessage("Upload successful.");
+    } catch (error) {
+      setUploadMessage(error.message);
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      
-      {/* Header */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Documents</h1>
@@ -59,12 +124,22 @@ export default function Documents() {
           </p>
         </div>
 
-        <button className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition">
-          <Upload size={16} /> Upload Document
+        <button
+          onClick={handleUploadClick}
+          disabled={uploading}
+          className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition disabled:opacity-50"
+        >
+          <Upload size={16} />
+          {uploading ? "Uploading..." : "Upload Document"}
         </button>
       </div>
 
-      {/* Search */}
+      {uploadMessage && (
+        <div className="mb-4 rounded-lg border px-4 py-3 text-sm text-gray-700 bg-white shadow-sm">
+          {uploadMessage}
+        </div>
+      )}
+
       <div className="flex gap-3 mb-6 items-center">
         <div className="flex items-center bg-white px-3 py-2 rounded-lg shadow-sm flex-1">
           <Search size={16} className="text-gray-400 mr-2" />
@@ -93,10 +168,7 @@ export default function Documents() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        
-        {/* Header Row */}
         <div className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr_1.5fr_1fr] px-6 py-4 text-sm text-gray-500 bg-gray-50">
           <div>Document</div>
           <div>Type</div>
@@ -107,68 +179,46 @@ export default function Documents() {
           <div className="text-center">Actions</div>
         </div>
 
-        {/* Rows */}
         {documents.map((doc, i) => (
           <div
             key={i}
             className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr_1.5fr_1fr] items-center px-6 py-4 border-t border-gray-100 hover:bg-gray-50 transition"
           >
-            
-            {/* Document */}
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                 📄
               </div>
 
               <div className="min-w-0">
-                <p className="font-medium truncate">
-                  {doc.name}
-                </p>
+                <p className="font-medium truncate">{doc.name}</p>
                 <p className="text-xs text-gray-400">{doc.id}</p>
               </div>
             </div>
 
-            {/* Type */}
             <div>
               <span
-                className={`text-xs px-2 py-1 rounded ${typeColor[doc.type]}`}
+                className={`text-xs px-2 py-1 rounded ${typeColor[doc.type] || "bg-gray-100 text-gray-700"}`}
               >
                 {doc.type}
               </span>
             </div>
 
-            {/* Case */}
-            <div className="text-gray-600 truncate">
-              {doc.case}
-            </div>
-
-            {/* Size */}
-            <div className="text-gray-600 whitespace-nowrap">
-              {doc.size}
-            </div>
-
-            {/* Status */}
+            <div className="text-gray-600 truncate">{doc.case}</div>
+            <div className="text-gray-600 whitespace-nowrap">{doc.size}</div>
             <div>
               <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">
                 {doc.status}
               </span>
             </div>
-
-            {/* Uploaded */}
             <div className="leading-tight">
               <p className="whitespace-nowrap">{doc.uploaded}</p>
-              <p className="text-xs text-gray-400 truncate">
-                {doc.author}
-              </p>
+              <p className="text-xs text-gray-400 truncate">{doc.author}</p>
             </div>
-
-            {/* Actions */}
             <div className="flex justify-center items-center gap-3">
               <Sparkles size={16} className="text-green-600 cursor-pointer" />
               <Download size={16} className="cursor-pointer" />
               <MoreVertical size={16} className="cursor-pointer" />
             </div>
-
           </div>
         ))}
       </div>
