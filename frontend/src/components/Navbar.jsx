@@ -74,7 +74,7 @@ import {
     ];
   
     return (
-      <div className="flex justify-between items-center bg-white px-6 py-3 border-[0.5px] border-gray-200 relative">
+      <div className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white/65 px-6 backdrop-blur-xl backdrop-saturate-150 supports-backdrop-filter:bg-white/55">
         
         {/* 🔍 SEARCH */}
         <div className="flex items-center bg-gray-100 px-3 py-2 rounded-lg w-[400px]">

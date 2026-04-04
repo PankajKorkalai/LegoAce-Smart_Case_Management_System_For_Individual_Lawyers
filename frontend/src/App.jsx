@@ -1,14 +1,24 @@
 // App.jsx
+import { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 import AppRoutes from "./routes/AppRoutes";
 
 export default function App() {
-  return (
-    <div className="flex">
-      <Sidebar />
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-      <div className="flex-1 bg-gray-50 min-h-screen">
+  return (
+    <div className="min-h-screen">
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
+
+      <div
+        className={`min-h-screen bg-gray-50 transition-[margin] duration-300 ease-out ${
+          sidebarCollapsed ? "ml-20" : "ml-64"
+        }`}
+      >
         <Navbar />
 
         <div className="p-6">
