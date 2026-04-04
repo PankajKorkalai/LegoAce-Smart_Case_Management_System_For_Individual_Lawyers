@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 import AppRoutes from "./routes/AppRoutes";
+import AuthRoutes from "./routes/AuthRoutes";
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -31,6 +32,7 @@ export default function App() {
 
         <div className={isLayoutBypassed ? "" : "p-6"}>
           <AppRoutes />
+          <AuthRoutes/>
         </div>
       </div>
     </div>
