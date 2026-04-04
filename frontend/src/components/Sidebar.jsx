@@ -44,7 +44,7 @@ export default function Sidebar({ collapsed, onCollapsedChange }) {
               <div className="bg-green-700 text-white p-2 rounded-lg">
                 <Scale size={18} />
               </div>
-              <span className="font-semibold">LegalFlow</span>
+              <span className="font-semibold">LegoAce</span>
             </div>
           )}
 
