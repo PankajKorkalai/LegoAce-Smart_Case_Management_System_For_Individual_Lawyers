@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const { Readable } = require("stream");
 const cloudinary = require("cloudinary").v2;
+const Document = require("../models/Documents.model");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -48,11 +49,27 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
   try {
     const result = await uploadBufferToCloudinary(req.file.buffer);
+
+    const documentRecord = await Document.create({
+      title: req.body.title || req.file.originalname,
+      originalName: req.file.originalname,
+      description: req.body.description || "",
+      caseName: req.body.caseName || "Unassigned",
+      documentType: req.body.documentType || "Uploaded Document",
+      status: req.body.status || "processed",
+      uploadedBy: req.body.uploadedBy || "system",
+      cloudinaryUrl: result.secure_url,
+      publicId: result.public_id,
+      resourceType: result.resource_type,
+      mimeType: req.file.mimetype,
+      sizeBytes: req.file.size,
+      sizeReadable: `${(req.file.size / 1024 / 1024).toFixed(2)} MB`,
+      rawResult: result,
+    });
+
     return res.status(201).json({
-      message: "File uploaded successfully.",
-      secure_url: result.secure_url,
-      public_id: result.public_id,
-      resource_type: result.resource_type,
+      message: "File uploaded and stored successfully.",
+      document: documentRecord,
     });
   } catch (error) {
     console.error("Cloudinary upload failed:", error);
