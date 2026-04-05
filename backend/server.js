@@ -6,6 +6,7 @@ dotenv.config();
 
 const connectDB = require("./db/db");
 const uploadRouter = require("./routes/upload");
+const documentsRouter = require("./routes/documents");
 
 connectDB();
 
@@ -21,6 +22,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api", uploadRouter);
+app.use("/api", documentsRouter);
 
 const PORT = process.env.PORT || 5000;
 

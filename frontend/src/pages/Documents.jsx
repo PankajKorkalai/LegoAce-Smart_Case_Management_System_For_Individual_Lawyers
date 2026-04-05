@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Upload,
@@ -10,39 +10,18 @@ import {
   X,
 } from "lucide-react";
 
-const initialDocuments = [
-  {
-    name: "Initial Complaint - Smith vs Johnson.pdf",
-    id: "DOC-001",
-    type: "Legal Filing",
-    case: "Smith vs. Johnson Corp",
-    size: "2.4 MB",
-    status: "processed",
-    uploaded: "Jan 15, 2024",
-    author: "Sarah Mitchell",
-  },
-  {
-    name: "Contract Agreement - Tech Corp.pdf",
-    id: "DOC-002",
-    type: "Evidence",
-    case: "Tech Corp Patent Infringement",
-    size: "1.8 MB",
-    status: "processed",
-    uploaded: "Jan 18, 2024",
-    author: "Michael Chen",
-  },
-];
-
 const typeColor = {
   "Legal Filing": "bg-green-100 text-green-700",
   Evidence: "bg-blue-100 text-blue-700",
+  Contract: "bg-indigo-100 text-indigo-700",
   "Uploaded Document": "bg-gray-100 text-gray-700",
 };
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Documents() {
-  const [documents, setDocuments] = useState(initialDocuments);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
 
@@ -54,21 +33,63 @@ export default function Documents() {
     docType: "Legal Filing",
   });
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("All Types");
+  const [filterCase, setFilterCase] = useState("All Cases");
+  const [viewMode, setViewMode] = useState("list");
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisDoc, setAnalysisDoc] = useState(null);
+  const [activeMenuId, setActiveMenuId] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+
   const fileInputRef = useRef(null);
+
+  const formatDate = (value) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const fetchDocuments = async () => {
+    setLoading(true);
+    setUploadMessage("");
+
+    try {
+      const response = await fetch(`${apiUrl}/api/documents`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load documents.");
+      }
+      setDocuments(data);
+    } catch (error) {
+      setUploadMessage(error.message);
+      setTimeout(() => setUploadMessage(""), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
-  // Step 1: File selected, open modal to ask for details
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setSelectedFile(file);
-    setIsModalOpen(true); // Open the details modal
+    setIsModalOpen(true);
   };
 
-  // Step 2: Final Upload with Tags
   const confirmUpload = async () => {
     if (!selectedFile) return;
 
@@ -78,9 +99,8 @@ export default function Documents() {
 
     const dataPayload = new FormData();
     dataPayload.append("file", selectedFile);
-    // You can send these to your backend to save in DB
     dataPayload.append("caseName", formData.caseName);
-    dataPayload.append("docType", formData.docType);
+    dataPayload.append("documentType", formData.docType);
 
     try {
       const response = await fetch(`${apiUrl}/api/upload`, {
@@ -91,26 +111,12 @@ export default function Documents() {
 
       if (!response.ok) throw new Error(data.error || "Upload failed");
 
-      const newDocument = {
-        name: selectedFile.name,
-        id: `DOC-${Date.now()}`,
-        type: formData.docType,
-        case: formData.caseName || "Unassigned",
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
-        status: "processed",
-        uploaded: new Date().toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        author: "You",
-        url: data.secure_url,
-      };
-
-      setDocuments((prev) => [newDocument, ...prev]);
+      setDocuments((prev) => [data.document, ...prev]);
       setUploadMessage("Upload successful.");
+      setTimeout(() => setUploadMessage(""), 3000);
     } catch (error) {
       setUploadMessage(error.message);
+      setTimeout(() => setUploadMessage(""), 3000);
     } finally {
       setUploading(false);
       setSelectedFile(null);
@@ -119,8 +125,146 @@ export default function Documents() {
     }
   };
 
+  const handleAnalyze = async (documentId) => {
+    setAnalysisOpen(true);
+    setAnalysisLoading(true);
+    setAnalysisResult(null);
+    const doc = documents.find((doc) => doc._id === documentId);
+    setAnalysisDoc(doc || null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/documents/${documentId}/analyze`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Document analysis failed.");
+      }
+
+      setAnalysisResult(data.analysis);
+    } catch (error) {
+      setAnalysisResult({ error: error.message });
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  const handleCloseAnalysis = () => {
+    setAnalysisOpen(false);
+    setAnalysisDoc(null);
+    setAnalysisResult(null);
+  };
+
+  const handleDownload = async (documentItem) => {
+    const fileUrl =
+      documentItem.cloudinaryUrl ||
+      documentItem.rawResult?.secure_url ||
+      documentItem.rawResult?.url;
+
+    if (!fileUrl) {
+      console.error("No download URL available", documentItem);
+      return;
+    }
+
+    try {
+      const link = document.createElement("a");
+      link.href = fileUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.download = documentItem.originalName || "document";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Download error:", error);
+      window.open(fileUrl, "_blank");
+    }
+  };
+
+  const handleOpenDocument = (documentItem) => {
+    const fileUrl =
+      documentItem.cloudinaryUrl ||
+      documentItem.rawResult?.secure_url ||
+      documentItem.rawResult?.url;
+
+    if (!fileUrl) {
+      console.error("No document URL available", documentItem);
+      return;
+    }
+
+    window.open(fileUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDelete = async (documentId) => {
+    const confirmed = window.confirm("Delete this document permanently?");
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/api/documents/${documentId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Delete failed.");
+      }
+
+      setDocuments((prev) => prev.filter((doc) => doc._id !== documentId));
+      setUploadMessage("Document deleted.");
+      setActiveMenuId(null);
+      setTimeout(() => setUploadMessage(""), 3000);
+    } catch (error) {
+      setUploadMessage(error.message);
+      setTimeout(() => setUploadMessage(""), 3000);
+    }
+  };
+
+  const handleToggleMenu = (docId, event) => {
+    if (event) {
+      event.stopPropagation();
+      const button = event.currentTarget;
+      const rect = button.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + window.scrollY + 5,
+        right: window.innerWidth - rect.right + 10,
+      });
+    }
+    setActiveMenuId((prev) => (prev === docId ? null : docId));
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeMenuId !== null) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [activeMenuId]);
+
+  const filterOptions = (items, field) => {
+    const values = items.map((item) => item[field] || "Unassigned");
+    return [`All ${field === "documentType" ? "Types" : "Cases"}`, ...new Set(values)];
+  };
+
+  const filteredDocuments = documents.filter((doc) => {
+    const matchesSearch = [doc.title, doc.originalName, doc.caseName]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    const matchesType = filterType === "All Types" || doc.documentType === filterType;
+    const matchesCase = filterCase === "All Cases" || doc.caseName === filterCase;
+
+    return matchesSearch && matchesType && matchesCase;
+  });
+
+  const typeOptions = filterOptions(documents, "documentType");
+  const caseOptions = filterOptions(documents, "caseName");
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen relative">
+    <div className="p-6 bg-gray-50 min-h-screen">
       <input
         ref={fileInputRef}
         type="file"
@@ -128,13 +272,13 @@ export default function Documents() {
         onChange={handleFileChange}
       />
 
-      {/* --- UPLOAD MODAL --- */}
+      {/* Upload Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center px-6 py-4 border-b">
               <h3 className="font-bold text-lg">Document Details</h3>
-              <button onClick={() => setIsModalOpen(false)}><X size={20} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="hover:bg-gray-100 p-1 rounded"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -169,16 +313,75 @@ export default function Documents() {
 
               <button
                 onClick={confirmUpload}
-                className="w-full bg-green-700 text-white py-3 rounded-lg font-semibold hover:bg-green-800 transition"
+                disabled={uploading}
+                className="w-full bg-green-700 text-white py-3 rounded-lg font-semibold hover:bg-green-800 transition disabled:opacity-50"
               >
-                Start Upload
+                {uploading ? "Uploading..." : "Start Upload"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- HEADER --- */}
+      {/* Analysis Modal */}
+      {analysisOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={handleCloseAnalysis}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-xl font-semibold">AI Document Analysis</h2>
+                <p className="text-sm text-gray-500">{analysisDoc?.title || analysisDoc?.originalName}</p>
+              </div>
+              <button onClick={handleCloseAnalysis} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 p-1 rounded">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
+              {analysisLoading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mb-4"></div>
+                  <p className="text-gray-500">Analyzing document, please wait...</p>
+                </div>
+              ) : analysisResult ? (
+                <div className="space-y-4 text-sm text-gray-700">
+                  {analysisResult.error ? (
+                    <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-red-700">
+                      {analysisResult.error}
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-2 text-base">Summary</h3>
+                        <p className="text-gray-700 leading-relaxed">{analysisResult.summary}</p>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-2 text-base">Key Points</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {analysisResult.keyPoints?.map((point, idx) => (
+                            <li key={idx} className="text-gray-700">{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-2 text-base">Recommendations</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {analysisResult.recommendations?.map((rec, idx) => (
+                            <li key={idx} className="text-gray-700">{rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">No analysis data available.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Documents</h1>
@@ -198,90 +401,247 @@ export default function Documents() {
       </div>
 
       {uploadMessage && (
-        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm bg-white ${uploadMessage.includes('failed') ? 'border-red-200 text-red-600' : 'border-green-100 text-gray-700'}`}>
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm ${
+          uploadMessage.includes('failed') || uploadMessage.includes('Unable') 
+            ? 'border-red-200 text-red-600 bg-red-50' 
+            : 'border-green-100 text-green-700 bg-green-50'
+        }`}>
           {uploadMessage}
         </div>
       )}
 
-      {/* --- FILTERS --- */}
-      <div className="flex gap-3 mb-6 items-center">
+      {/* Filters */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center mb-6">
         <div className="flex items-center bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 flex-1">
           <Search size={16} className="text-gray-400 mr-2" />
           <input
             type="text"
             placeholder="Search documents by name or case..."
             className="outline-none w-full text-sm bg-transparent"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <select className="px-3 py-2 rounded-lg bg-white border border-gray-200 shadow-sm text-sm outline-none">
-          <option>All Types</option>
+        <select
+          className="px-3 py-2 rounded-lg bg-white border border-gray-200 shadow-sm text-sm outline-none"
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+        >
+          {typeOptions.map((typeOption) => (
+            <option key={typeOption} value={typeOption}>{typeOption}</option>
+          ))}
         </select>
-        <select className="px-3 py-2 rounded-lg bg-white border border-gray-200 shadow-sm text-sm outline-none">
-          <option>All Cases</option>
+        <select
+          className="px-3 py-2 rounded-lg bg-white border border-gray-200 shadow-sm text-sm outline-none"
+          value={filterCase}
+          onChange={(e) => setFilterCase(e.target.value)}
+        >
+          {caseOptions.map((caseOption) => (
+            <option key={caseOption} value={caseOption}>{caseOption}</option>
+          ))}
         </select>
         <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <button className="p-2 bg-gray-100"><List size={16} /></button>
-          <button className="p-2 text-gray-400"><Grid size={16} /></button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-2 transition ${viewMode === "list" ? "bg-gray-100" : "hover:bg-gray-50"}`}
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-2 transition ${viewMode === "grid" ? "bg-gray-100" : "hover:bg-gray-50"}`}
+          >
+            <Grid size={16} />
+          </button>
         </div>
       </div>
 
-      {/* --- TABLE --- */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="text-sm text-gray-500 bg-gray-50/50 border-b">
-              <th className="px-6 py-4 font-medium">Document</th>
-              <th className="px-4 py-4 font-medium">Type</th>
-              <th className="px-4 py-4 font-medium">Case</th>
-              <th className="px-4 py-4 font-medium">Size</th>
-              <th className="px-4 py-4 font-medium">AI Status</th>
-              <th className="px-4 py-4 font-medium">Uploaded</th>
-              <th className="px-6 py-4 font-medium text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {documents.map((doc, i) => (
-              <tr key={i} className="hover:bg-gray-50/50 transition group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl shrink-0 group-hover:bg-white border transition">📄</div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate max-w-[180px]">{doc.name}</p>
-                      <p className="text-[10px] text-gray-400 font-mono uppercase">{doc.id}</p>
-                    </div>
+      {/* Grid View */}
+      {viewMode === "grid" ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {loading ? (
+            <div className="col-span-full p-8 text-center text-gray-500">Loading documents...</div>
+          ) : filteredDocuments.length === 0 ? (
+            <div className="col-span-full p-8 text-center text-gray-500">No documents found.</div>
+          ) : (
+            filteredDocuments.map((doc) => (
+              <div key={doc._id} className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm relative">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-gray-400">{doc.documentType}</p>
+                    <h3 className="mt-3 text-base font-semibold text-gray-900 truncate">{doc.title || doc.originalName}</h3>
+                    <p className="mt-2 text-sm text-gray-500 truncate">{doc.caseName || "No case assigned"}</p>
                   </div>
-                </td>
-                <td className="px-4 py-4">
-                  <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded ${typeColor[doc.type] || "bg-gray-100 text-gray-700"}`}>
-                    {doc.type}
-                  </span>
-                </td>
-                <td className="px-4 py-4 text-sm text-gray-600 italic">
-                  {doc.case}
-                </td>
-                <td className="px-4 py-4 text-sm text-gray-500">{doc.size}</td>
-                <td className="px-4 py-4">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    {doc.status}
-                  </span>
-                </td>
-                <td className="px-4 py-4 leading-tight">
-                  <p className="text-sm font-medium text-gray-700">{doc.uploaded}</p>
-                  <p className="text-xs text-gray-400">{doc.author}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-center items-center gap-4 text-gray-400">
-                    <Sparkles size={18} className="text-green-600 hover:scale-110 transition cursor-pointer" title="AI Analyze" />
-                    <Download size={18} className="hover:text-gray-600 cursor-pointer" />
-                    <MoreVertical size={18} className="hover:text-gray-600 cursor-pointer" />
+                  <button 
+                    onClick={(e) => handleToggleMenu(doc._id, e)} 
+                    className="text-gray-400 hover:text-gray-700"
+                  >
+                    <MoreVertical size={20} />
+                  </button>
+                </div>
+
+                <p className="mt-4 text-sm text-gray-500">{doc.sizeReadable} · {formatDate(doc.createdAt)}</p>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleAnalyze(doc._id)}
+                    className="rounded-full border border-green-100 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-100 transition"
+                  >
+                    <Sparkles size={14} className="inline mr-1" />
+                    Analyze
+                  </button>
+                  <button
+                    onClick={() => handleDownload(doc)}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
+                  >
+                    <Download size={14} className="inline mr-1" />
+                    Download
+                  </button>
+                  <button
+                    onClick={() => handleOpenDocument(doc)}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
+                  >
+                    Open
+                  </button>
+                </div>
+
+                {activeMenuId === doc._id && (
+                  <div 
+                    className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
+                    style={{
+                      top: `${menuPosition.top}px`,
+                      right: `${menuPosition.right}px`,
+                    }}
+                  >
+                    <button
+                      onClick={() => { handleOpenDocument(doc); setActiveMenuId(null); }}
+                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
+                    >
+                      Open document
+                    </button>
+                    <button
+                      onClick={() => { handleDelete(doc._id); }}
+                      className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-gray-50 transition"
+                    >
+                      Delete document
+                    </button>
                   </div>
-                </td>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        /* List View */
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="text-sm text-gray-500 bg-gray-50/50 border-b">
+                <th className="px-6 py-4 font-medium">Document</th>
+                <th className="px-4 py-4 font-medium">Type</th>
+                <th className="px-4 py-4 font-medium">Case</th>
+                <th className="px-4 py-4 font-medium">Size</th>
+                <th className="px-4 py-4 font-medium">AI Status</th>
+                <th className="px-4 py-4 font-medium">Uploaded</th>
+                <th className="px-6 py-4 font-medium text-center">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Loading documents...</td>
+                </tr>
+              ) : filteredDocuments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">No documents found.</td>
+                </tr>
+              ) : (
+                filteredDocuments.map((doc) => (
+                  <tr key={doc._id} className="hover:bg-gray-50/50 transition group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl shrink-0 group-hover:bg-white border transition">📄</div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 truncate max-w-[180px]">{doc.title || doc.originalName}</p>
+                          <p className="text-[10px] text-gray-400 font-mono uppercase">{doc._id.slice(-8)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded ${typeColor[doc.documentType] || "bg-gray-100 text-gray-700"}`}>
+                        {doc.documentType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-600 italic">{doc.caseName || "-"}</td>
+                    <td className="px-4 py-4 text-sm text-gray-500">{doc.sizeReadable}</td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        {doc.status || "Processed"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 leading-tight">
+                      <p className="text-sm font-medium text-gray-700">{formatDate(doc.createdAt)}</p>
+                      <p className="text-xs text-gray-400">{doc.uploadedBy || "User"}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center items-center gap-3 text-gray-400">
+                        <button onClick={() => handleAnalyze(doc._id)} className="hover:text-gray-700 transition" title="Analyze document">
+                          <Sparkles size={18} />
+                        </button>
+                        <button onClick={() => handleDownload(doc)} className="hover:text-gray-700 transition" title="Download document">
+                          <Download size={18} />
+                        </button>
+                        <div className="relative">
+                          <button 
+                            onClick={(e) => handleToggleMenu(doc._id, e)} 
+                            className="hover:text-gray-700 transition" 
+                            title="More actions"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Global Menu Dropdown - Rendered outside table to avoid overflow issues */}
+      {activeMenuId && (
+        <div 
+          className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
+          style={{
+            top: `${menuPosition.top}px`,
+            right: `${menuPosition.right}px`,
+          }}
+        >
+          {(() => {
+            const doc = documents.find(d => d._id === activeMenuId);
+            if (!doc) return null;
+            return (
+              <>
+                <button
+                  onClick={() => { handleOpenDocument(doc); setActiveMenuId(null); }}
+                  className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Open document
+                </button>
+                <button
+                  onClick={() => { handleDelete(doc._id); }}
+                  className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-gray-50 transition"
+                >
+                  Delete document
+                </button>
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
