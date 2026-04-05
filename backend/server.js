@@ -6,8 +6,12 @@ dotenv.config();
 
 const connectDB = require("./db/db");
 const uploadRouter = require("./routes/upload");
+const documentsRouter = require("./routes/documents");
 const userRouter = require("./routes/user");
 const aiRouter = require("./routes/ai");
+const clientRouter = require("./routes/client");
+const profileRouter = require("./routes/profile");
+const scheduleRouter = require("./routes/schedule"); 
 
 connectDB();
 
@@ -22,10 +26,13 @@ app.get("/", (req, res) => {
   res.send("Backend running with CommonJS 🚀");
 });
 
-
 app.use("/api", uploadRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api", documentsRouter);
 app.use("/user", userRouter);
+app.use("/api", clientRouter);
+app.use("/api", profileRouter);
+app.use("/api/meetings", scheduleRouter); 
 
 const PORT = process.env.PORT || 5000;
 
