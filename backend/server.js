@@ -8,6 +8,8 @@ const connectDB = require("./db/db");
 const uploadRouter = require("./routes/upload");
 const documentsRouter = require("./routes/documents");
 const userRouter = require("./routes/user");
+const clientRouter = require("./routes/client");
+const profileRouter = require("./routes/profile");
 
 connectDB();
 
@@ -26,6 +28,9 @@ app.get("/", (req, res) => {
 app.use("/api", uploadRouter);
 app.use("/api", documentsRouter);
 app.use("/user", userRouter);
+app.use("/api", clientRouter);
+app.use("/api", profileRouter);
+
 
 const PORT = process.env.PORT || 5000;
 
