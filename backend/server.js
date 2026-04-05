@@ -7,6 +7,8 @@ dotenv.config();
 const connectDB = require("./db/db");
 const uploadRouter = require("./routes/upload");
 const userRouter = require("./routes/user");
+// 1. ADD THIS IMPORT
+const scheduleRouter = require("./routes/schedule"); 
 
 connectDB();
 
@@ -21,9 +23,10 @@ app.get("/", (req, res) => {
   res.send("Backend running with CommonJS 🚀");
 });
 
-
 app.use("/api", uploadRouter);
 app.use("/user", userRouter);
+// 2. MOUNT THE NEW ROUTER
+app.use("/api/meetings", scheduleRouter); 
 
 const PORT = process.env.PORT || 5000;
 
