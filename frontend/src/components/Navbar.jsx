@@ -20,6 +20,9 @@ import {
     const notifRef = useRef(null);
     const profileRef = useRef(null);
   
+    const userName = localStorage.getItem("userName") || "Sarah Mitchell";
+    const userInitials = userName.charAt(0).toUpperCase();
+
     // 🔥 OUTSIDE CLICK HANDLER
     useEffect(() => {
       function handleClickOutside(event) {
@@ -168,12 +171,12 @@ import {
             }}
           >
             <div className="w-8 h-8 bg-green-700 text-white rounded-full flex items-center justify-center font-medium">
-              S
+              {userInitials}
             </div>
   
             <div className="text-sm hidden sm:block">
-              <p className="font-medium">Sarah Mitchell</p>
-              <p className="text-gray-500 text-xs">Senior Partner</p>
+              <p className="font-medium">{userName}</p>
+              <p className="text-gray-500 text-xs">Legal Professional</p>
             </div>
           </div>
   
@@ -182,8 +185,8 @@ import {
             <div className="absolute right-0 top-10 w-52 bg-white rounded-xl shadow-xl z-50">
               
               <div className="px-4 py-3 border-b">
-                <p className="font-medium">Sarah Mitchell</p>
-                <p className="text-xs text-gray-500">Senior Partner</p>
+                <p className="font-medium">{userName}</p>
+                <p className="text-xs text-gray-500">Legal Professional</p>
               </div>
   
               <div className="p-2 text-sm space-y-1">
@@ -197,7 +200,14 @@ import {
                   Settings
                 </button>
   
-                <button className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100 text-red-600">
+                <button 
+                  onClick={() => {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("userName");
+                    navigate("/login");
+                  }} 
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100 text-red-600"
+                >
                   <LogOut size={16} />
                   Logout
                 </button>
