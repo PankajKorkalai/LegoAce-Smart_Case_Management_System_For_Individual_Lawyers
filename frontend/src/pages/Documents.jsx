@@ -154,11 +154,17 @@ export default function Documents() {
     setAnalysisResult(null);
   };
 
-  const handleDownload = async (documentItem) => {
-    const fileUrl =
+  const getDocumentUrl = (documentItem) => {
+    return (
+      documentItem.signedUrl ||
       documentItem.cloudinaryUrl ||
       documentItem.rawResult?.secure_url ||
-      documentItem.rawResult?.url;
+      documentItem.rawResult?.url
+    );
+  };
+
+  const handleDownload = async (documentItem) => {
+    const fileUrl = getDocumentUrl(documentItem);
 
     if (!fileUrl) {
       console.error("No download URL available", documentItem);
@@ -181,10 +187,7 @@ export default function Documents() {
   };
 
   const handleOpenDocument = (documentItem) => {
-    const fileUrl =
-      documentItem.cloudinaryUrl ||
-      documentItem.rawResult?.secure_url ||
-      documentItem.rawResult?.url;
+    const fileUrl = getDocumentUrl(documentItem);
 
     if (!fileUrl) {
       console.error("No document URL available", documentItem);

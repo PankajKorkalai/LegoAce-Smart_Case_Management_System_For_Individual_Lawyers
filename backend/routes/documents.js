@@ -22,7 +22,21 @@ cloudinary.config({
 router.get("/documents", async (req, res) => {
   try {
     const documents = await Document.find().sort({ createdAt: -1 });
-    res.json(documents);
+
+    const documentsWithUrls = documents.map((doc) => {
+      const signedUrl = cloudinary.url(doc.publicId, {
+        resource_type: doc.resourceType || "auto",
+        secure: true,
+        sign_url: true,
+      });
+
+      return {
+        ...doc.toObject(),
+        signedUrl,
+      };
+    });
+
+    res.json(documentsWithUrls);
   } catch (error) {
     console.error("Failed to fetch documents:", error);
     res.status(500).json({ error: "Unable to fetch documents." });

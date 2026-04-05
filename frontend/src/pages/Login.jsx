@@ -1,8 +1,59 @@
 import React, { useState } from "react";
 import { Eye, Mail, Lock } from "lucide-react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
+  const [mail, setMail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [isLogin, setIsLogin] = useState(true);
+  const navigate=useNavigate();
+
+  const handleSignUp = async () => {
+    if(!mail || !password || (!isLogin && !name)){
+      alert("Please fill all the fields");
+      return;
+    }
+    console.log("here");
+     if(isLogin){
+       const resp=await axios.post(`${import.meta.env.VITE_API_URL}/user/login`,{
+        email:mail,
+        password
+      });
+      if(resp.data.message==="User_not_exists"){
+        alert("Invalid email or password. Please try again.");
+        return;
+      } else{
+        navigate("/");
+      }
+     } else{
+      console.log("name ",name);
+      console.log("mail ",mail);
+      console.log("password ",password);
+         const resp=await axios.post(`${import.meta.env.VITE_API_URL}/user/register`,{
+        name,
+        email:mail,
+        password
+      });
+
+      console.log("resp ",resp);
+      if(resp.data.message==="Email_Present"){
+        alert("Email already registered. Please log in.");
+        return;
+      } else if(resp.data.message==="Invalid_types"){
+        alert("Invalid input types. Please check your entries.");
+        return;
+      } 
+
+      else{
+      navigate("/");
+      }
+
+      console.log("resp ",resp);
+     }
+
+  }
 
   return (
     <div className="h-screen flex">
@@ -85,7 +136,7 @@ const Login = () => {
               <div>
                 <label className="text-sm font-medium">Full Name</label>
                 <div className="mt-1 border rounded-lg px-3 py-3">
-                  <input
+                  <input onChange={(e) => setName(e.target.value)}
                     type="text"
                     placeholder="Enter your name"
                     className="w-full outline-none text-sm"
@@ -99,7 +150,7 @@ const Login = () => {
               <label className="text-sm font-medium">Email Address</label>
               <div className="mt-1 border rounded-lg px-3 py-3 flex items-center gap-2">
                 <Mail size={16} className="text-gray-400" />
-                <input
+                <input  onChange={(e) => setMail(e.target.value)}
                   type="email"
                   placeholder="john@lawfirm.com"
                   className="w-full outline-none text-sm"
@@ -121,7 +172,7 @@ const Login = () => {
               <div className="mt-1 border rounded-lg px-3 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2 w-full">
                   <Lock size={16} className="text-gray-400" />
-                  <input
+                  <input onChange={(e) => setPassword(e.target.value)}
                     type="password"
                     placeholder="Enter your password"
                     className="w-full outline-none text-sm"
@@ -140,7 +191,7 @@ const Login = () => {
             )}
 
             {/* Button */}
-            <button className="w-full bg-[#0f7a3d] text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-[#0d6b35] transition">
+            <button onClick={handleSignUp} className="w-full bg-[#0f7a3d] text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-[#0d6b35] transition">
               {isLogin ? "Sign In" : "Sign Up"}
               <span>→</span>
             </button>
