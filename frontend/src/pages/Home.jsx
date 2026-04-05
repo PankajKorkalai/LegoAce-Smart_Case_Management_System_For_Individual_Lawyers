@@ -25,6 +25,10 @@ import CapabilitiesSection from '../components/CapabilitiesSectio';
 import IntegrationsSection from '../components/IntegrationsSection';
 import TestimonialsSection from '../components/TestimonialsSection';
 import PricingSection from '../components/PricingSection';
+import FAQSection from '../components/FAQSection';
+import CTASection from '../components/CTASection';
+import Footer from '../components/Footer';
+import Navbar2 from '../components/Navbar2';
 
 const Home = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -159,6 +163,7 @@ const Home = () => {
 
   return (
     <>
+    <Navbar2/>
       <HeroSection/>
       <StatsAndTrust/>
       <FeaturesSection/>
@@ -167,6 +172,9 @@ const Home = () => {
       <IntegrationsSection/>
       <TestimonialsSection/>
       <PricingSection/>
+      <FAQSection/>
+      <CTASection/>
+      <Footer/>
     </>
   );
 };
