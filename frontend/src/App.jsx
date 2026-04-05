@@ -1,10 +1,9 @@
 // App.jsx
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, matchPath } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 import AppRoutes from "./routes/AppRoutes";
-import AuthRoutes from "./routes/AuthRoutes";
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -12,9 +11,17 @@ export default function App() {
 
   // Paths where we want a full page view without the Sidebar and Navbar
   const bypassLayoutPaths = ["/", "/auth", "/login"];
+  
+  const layoutPathsPattern = [
+    "/dashboard", "/cases", "/clients", "/documents",
+    "/feedback", "/calendar", "/video", "/settings", "/profile", "/ai"
+  ];
+  const hasLayout = layoutPathsPattern.some(path => matchPath({ path, end: true }, location.pathname));
+
   const isLayoutBypassed =
     bypassLayoutPaths.includes(location.pathname) ||
-    location.pathname.startsWith("/p/");
+    location.pathname.startsWith("/p/") ||
+    !hasLayout;
 
   return (
     <div className="min-h-screen relative">
@@ -34,7 +41,6 @@ export default function App() {
 
         <div className={isLayoutBypassed ? "" : "p-6"}>
           <AppRoutes />
-          <AuthRoutes/>
         </div>
       </div>
     </div>

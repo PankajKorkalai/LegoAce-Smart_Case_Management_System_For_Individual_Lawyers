@@ -9,6 +9,8 @@ import Documents from "../pages/Documents";
 import Calendar from "../pages/Calendar";
 import Video from "../pages/Video";
 import Settings from "../pages/Settings";
+import Login from "../pages/Login";
+import NotFound from "../pages/NotFound";
 
 
 // ❗ optional (only if file exists)
@@ -21,6 +23,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/cases" element={<Cases />} />
       <Route path="/clients" element={<Clients />} />
@@ -35,6 +38,9 @@ export default function AppRoutes() {
 
       {/* optional */}
       <Route path="/ai" element={<AI />} />
+
+      {/* 404 Route */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
