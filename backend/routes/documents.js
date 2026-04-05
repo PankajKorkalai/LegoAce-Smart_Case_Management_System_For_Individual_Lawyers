@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const Document = require("../models/Documents.model");
+const axios = require("axios");
 
 const router = express.Router();
 
@@ -22,24 +23,95 @@ cloudinary.config({
 router.get("/documents", async (req, res) => {
   try {
     const documents = await Document.find().sort({ createdAt: -1 });
-
-    const documentsWithUrls = documents.map((doc) => {
-      const signedUrl = cloudinary.url(doc.publicId, {
-        resource_type: doc.resourceType || "auto",
-        secure: true,
-        sign_url: true,
-      });
-
-      return {
-        ...doc.toObject(),
-        signedUrl,
-      };
-    });
-
-    res.json(documentsWithUrls);
+    res.json(documents);
   } catch (error) {
     console.error("Failed to fetch documents:", error);
     res.status(500).json({ error: "Unable to fetch documents." });
+  }
+});
+
+// GET document for viewing (inline viewer)
+router.get("/documents/:id/view", async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found." });
+    }
+
+    let viewUrl;
+    const { mimeType, publicId, resourceType, cloudinaryUrl } = document;
+
+    // For PDFs - direct view
+    if (mimeType === 'application/pdf') {
+      viewUrl = cloudinary.url(publicId, {
+        resource_type: resourceType || "auto",
+        secure: true,
+      });
+    }
+    // For images - direct view
+    else if (mimeType?.startsWith('image/')) {
+      viewUrl = cloudinary.url(publicId, {
+        resource_type: resourceType || "image",
+        secure: true,
+      });
+    }
+    // For Word, Excel, PPT - Google Docs Viewer
+    else if (
+      mimeType === 'application/msword' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimeType === 'application/vnd.ms-excel' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType === 'application/vnd.ms-powerpoint' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ) {
+      const fileUrl = cloudinary.url(publicId, {
+        resource_type: resourceType || "raw",
+        secure: true,
+      });
+      viewUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+    } else {
+      viewUrl = cloudinaryUrl;
+    }
+
+    res.json({ viewUrl, mimeType: document.mimeType });
+  } catch (error) {
+    console.error("Failed to get document view:", error);
+    res.status(500).json({ error: "Unable to get document view." });
+  }
+});
+
+// 🔥 DOWNLOAD document - WORKING SOLUTION 🔥
+router.get("/documents/:id/download", async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found." });
+    }
+
+    // Get file from Cloudinary
+    const fileUrl = cloudinary.url(document.publicId, {
+      resource_type: document.resourceType || "auto",
+      secure: true,
+    });
+
+    // Fetch file from Cloudinary
+    const response = await axios({
+      method: 'GET',
+      url: fileUrl,
+      responseType: 'stream'
+    });
+
+    // Set proper headers for download
+    res.setHeader('Content-Type', document.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.originalName)}"`);
+    res.setHeader('Content-Length', document.sizeBytes);
+
+    // Stream the file to response
+    response.data.pipe(res);
+    
+  } catch (error) {
+    console.error("Download error:", error);
+    res.status(500).json({ error: "Unable to download document." });
   }
 });
 
@@ -75,18 +147,20 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     // Create document record
     const document = new Document({
-      originalName: file.originalname,
       title: file.originalname.split(".")[0],
+      originalName: file.originalname,
+      description: "",
+      caseName: caseName || "Unassigned",
+      documentType: documentType || "Uploaded Document",
+      status: "processed",
+      uploadedBy: "Anonymous",
       cloudinaryUrl: uploadResult.secure_url,
       publicId: uploadResult.public_id,
       resourceType: uploadResult.resource_type,
       mimeType: file.mimetype,
-      size: file.size,
+      sizeBytes: file.size,
       sizeReadable: formatBytes(file.size),
-      documentType: documentType || "Uploaded Document",
-      caseName: caseName || "",
-      uploadedBy: req.user?.email || "Anonymous",
-      status: "Processed",
+      rawResult: uploadResult,
     });
 
     await document.save();
@@ -111,27 +185,17 @@ router.get("/documents/:id/analyze", async (req, res) => {
 
     const analysis = {
       title: document.title || document.originalName,
-      summary: `This document is a ${document.documentType.toLowerCase()} related to "${document.caseName || "an unspecified case"}". It was uploaded on ${new Date(document.createdAt).toLocaleDateString()} and is currently stored securely in Cloudinary. The file size is ${document.sizeReadable} and it is of type ${document.mimeType}.`,
+      summary: `This document is a ${document.documentType.toLowerCase()} related to "${document.caseName || "an unspecified case"}". File size: ${document.sizeReadable}`,
       keyPoints: [
         `Document Type: ${document.documentType}`,
-        `Case Association: ${document.caseName || "Not assigned to any case"}`,
-        `Original Filename: ${document.originalName}`,
-        `File Size: ${document.sizeReadable}`,
-        `Storage: Cloudinary (${document.resourceType})`,
-        `Upload Date: ${new Date(document.createdAt).toLocaleDateString()}`,
+        `Case: ${document.caseName || "Not assigned"}`,
+        `File: ${document.originalName}`,
+        `Size: ${document.sizeReadable}`,
       ],
       recommendations: [
-        "Review the document for legal compliance and relevance to the case.",
-        "Consider sharing this document with relevant legal team members.",
-        "Ensure all metadata is accurate for future reference.",
-        "Set up document retention policies if needed.",
+        "Review document for legal compliance",
+        "Share with relevant team members",
       ],
-      metadata: {
-        mimeType: document.mimeType,
-        uploadedBy: document.uploadedBy,
-        createdAt: document.createdAt,
-        documentId: document._id,
-      },
     };
 
     res.json({ analysis });

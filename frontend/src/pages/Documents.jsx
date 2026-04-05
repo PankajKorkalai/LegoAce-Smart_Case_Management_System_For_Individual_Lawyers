@@ -8,6 +8,9 @@ import {
   List,
   Grid,
   X,
+  Maximize2,
+  Minimize2,
+  FileText,
 } from "lucide-react";
 
 const typeColor = {
@@ -19,11 +22,154 @@ const typeColor = {
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// Document Viewer Component (inline)
+function DocumentViewer({ document, onClose, onDownload }) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewUrl, setViewUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchViewUrl = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/documents/${document._id}/view`);
+        const data = await response.json();
+        setViewUrl(data.viewUrl);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchViewUrl();
+  }, [document._id]);
+
+  const toggleFullscreen = () => {
+    const elem = document.getElementById('document-viewer-container');
+    if (!isFullscreen) {
+      elem?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const getEmbedCode = () => {
+    const { mimeType } = document;
+    
+    // For PDF
+    if (mimeType === 'application/pdf') {
+      return (
+        <iframe
+          src={`${viewUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+          className="w-full h-full"
+          title={document.title}
+        />
+      );
+    }
+    
+    // For Images
+    if (mimeType?.startsWith('image/')) {
+      return (
+        <img 
+          src={viewUrl} 
+          alt={document.title}
+          className="max-w-full max-h-full object-contain mx-auto"
+        />
+      );
+    }
+    
+    // For Word, Excel, PPT using Google Docs Viewer
+    return (
+      <iframe
+        src={viewUrl}
+        className="w-full h-full"
+        title={document.title}
+        allow="autoplay"
+      />
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+      {/* Header */}
+      <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-800 rounded-lg transition"
+          >
+            <X size={20} />
+          </button>
+          <div>
+            <h3 className="font-medium text-sm">{document.title || document.originalName}</h3>
+            <p className="text-xs text-gray-400">{document.sizeReadable} • {document.documentType}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onDownload(document)}
+            className="p-2 hover:bg-gray-800 rounded-lg transition"
+            title="Download"
+          >
+            <Download size={18} />
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 hover:bg-gray-800 rounded-lg transition"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Viewer Body */}
+      <div id="document-viewer-container" className="flex-1 bg-gray-800 p-4">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+              <p className="text-white">Loading document...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-red-400">
+              <p className="text-lg mb-2">Failed to load document</p>
+              <p className="text-sm">{error}</p>
+              <button
+                onClick={() => window.open(document.cloudinaryUrl, '_blank')}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Open in New Tab
+              </button>
+            </div>
+          </div>
+        ) : (
+          getEmbedCode()
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Documents() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [viewerDoc, setViewerDoc] = useState(null);
 
   // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -155,46 +301,26 @@ export default function Documents() {
   };
 
   const getDocumentUrl = (documentItem) => {
-    return (
-      documentItem.signedUrl ||
-      documentItem.cloudinaryUrl ||
-      documentItem.rawResult?.secure_url ||
-      documentItem.rawResult?.url
-    );
+    return documentItem.signedUrl || documentItem.cloudinaryUrl;
   };
 
   const handleDownload = async (documentItem) => {
-    const fileUrl = getDocumentUrl(documentItem);
-
-    if (!fileUrl) {
-      console.error("No download URL available", documentItem);
-      return;
-    }
-
-    try {
-      const link = document.createElement("a");
-      link.href = fileUrl;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.download = documentItem.originalName || "document";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error("Download error:", error);
-      window.open(fileUrl, "_blank");
-    }
-  };
+  try {
+    // Create a temporary anchor element
+    const link = document.createElement('a');
+    link.href = `${apiUrl}/api/documents/${documentItem._id}/download`;
+    link.download = documentItem.originalName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error("Download error:", error);
+    alert("Download failed. Please try again.");
+  }
+};
 
   const handleOpenDocument = (documentItem) => {
-    const fileUrl = getDocumentUrl(documentItem);
-
-    if (!fileUrl) {
-      console.error("No document URL available", documentItem);
-      return;
-    }
-
-    window.open(fileUrl, "_blank", "noopener,noreferrer");
+    setViewerDoc(documentItem);
   };
 
   const handleDelete = async (documentId) => {
@@ -274,6 +400,15 @@ export default function Documents() {
         className="hidden"
         onChange={handleFileChange}
       />
+
+      {/* Document Viewer Modal */}
+      {viewerDoc && (
+        <DocumentViewer
+          document={viewerDoc}
+          onClose={() => setViewerDoc(null)}
+          onDownload={handleDownload}
+        />
+      )}
 
       {/* Upload Modal */}
       {isModalOpen && (
@@ -504,7 +639,8 @@ export default function Documents() {
                     onClick={() => handleOpenDocument(doc)}
                     className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
                   >
-                    Open
+                    <FileText size={14} className="inline mr-1" />
+                    View
                   </button>
                 </div>
 
@@ -520,7 +656,7 @@ export default function Documents() {
                       onClick={() => { handleOpenDocument(doc); setActiveMenuId(null); }}
                       className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
                     >
-                      Open document
+                      View document
                     </button>
                     <button
                       onClick={() => { handleDelete(doc._id); }}
@@ -614,7 +750,7 @@ export default function Documents() {
         </div>
       )}
 
-      {/* Global Menu Dropdown - Rendered outside table to avoid overflow issues */}
+      {/* Global Menu Dropdown */}
       {activeMenuId && (
         <div 
           className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
@@ -632,7 +768,7 @@ export default function Documents() {
                   onClick={() => { handleOpenDocument(doc); setActiveMenuId(null); }}
                   className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
                 >
-                  Open document
+                  View document
                 </button>
                 <button
                   onClick={() => { handleDelete(doc._id); }}
