@@ -75,7 +75,7 @@ const Navbar2 = () => {
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-6">
               <a 
-                href="#signin" 
+                href="/login" 
                 className="text-gray-900 hover:text-[#047857] font-medium text-sm transition-colors"
               >
                 Sign In
