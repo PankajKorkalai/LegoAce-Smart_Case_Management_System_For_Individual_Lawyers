@@ -12,7 +12,8 @@ import {
   Scale,
   ChevronLeft,
   ChevronRight,
-  Star
+  Star,
+  IdCard,
 } from "lucide-react";
 
 const menu = [
@@ -24,6 +25,7 @@ const menu = [
   { name: "AI Assistant", path: "/ai", icon: MessageSquare },
   { name: "Calendar", path: "/calendar", icon: Calendar },
   { name: "Video Consult", path: "/video", icon: Video },
+  { name: "Public Profile", path: "/p/demo", icon: IdCard },
 ];
 
 export default function Sidebar({ collapsed, onCollapsedChange }) {
