@@ -12,7 +12,9 @@ export default function App() {
 
   // Paths where we want a full page view without the Sidebar and Navbar
   const bypassLayoutPaths = ["/", "/auth", "/login"];
-  const isLayoutBypassed = bypassLayoutPaths.includes(location.pathname);
+  const isLayoutBypassed =
+    bypassLayoutPaths.includes(location.pathname) ||
+    location.pathname.startsWith("/p/");
 
   return (
     <div className="min-h-screen relative">

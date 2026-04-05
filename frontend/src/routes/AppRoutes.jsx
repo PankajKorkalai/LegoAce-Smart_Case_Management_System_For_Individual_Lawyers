@@ -15,6 +15,7 @@ import Settings from "../pages/Settings";
 import AI from "../pages/AI";
 import Profile from "../pages/Profile";
 import FeedbackPage from "../pages/Feedback";
+import LawyerPublicProfile from "../pages/LawyerPublicProfile";
 
 export default function AppRoutes() {
   return (
@@ -29,6 +30,8 @@ export default function AppRoutes() {
       <Route path="/video" element={<Video />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/profile" element={<Profile />} />
+      {/* Public shareable lawyer card */}
+      <Route path="/p/:slug" element={<LawyerPublicProfile />} />
 
       {/* optional */}
       <Route path="/ai" element={<AI />} />
