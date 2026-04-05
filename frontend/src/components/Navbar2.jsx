@@ -49,7 +49,7 @@ const Navbar2 = () => {
             <div className="flex items-center gap-3 cursor-pointer">
               {/* Image from public folder */}
               <img 
-                src="/legoace_logo.png" 
+                src="/favicon.png" 
                 alt="LegalFlow AI Logo" 
                 className="w-10 h-10 object-contain" 
               />
@@ -120,7 +120,7 @@ const Navbar2 = () => {
               ))}
               <div className="pt-4 mt-4 border-t border-gray-100 flex flex-col gap-3">
                 <a
-                  href="#signin"
+                  href="/login"
                   className="block px-3 py-2 text-center rounded-lg text-base font-medium text-gray-900 hover:bg-gray-50 border border-gray-200"
                 >
                   Sign In
