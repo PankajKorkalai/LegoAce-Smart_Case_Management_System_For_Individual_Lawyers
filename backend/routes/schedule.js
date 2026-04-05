@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 const nodemailer = require("nodemailer");
 
-// CORRECTED PATH: Going up one level from routes, into models
 const User = require("../models/UserModel"); 
+const Meeting = require("../models/MeetingModel"); // 1. IMPORT NEW MODEL
 
-// 1. GET route to fetch all users for the dropdown
+// Fetch all users for the dropdown
 router.get("/users", async (req, res) => {
   try {
     const users = await User.find({}, "name email");
@@ -15,13 +15,24 @@ router.get("/users", async (req, res) => {
   }
 });
 
+// 2. NEW ROUTE: Fetch all upcoming meetings
+router.get("/upcoming", async (req, res) => {
+  try {
+    // Sort by newest first
+    const meetings = await Meeting.find().sort({ dateSent: -1 });
+    res.status(200).json(meetings);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch meetings" });
+  }
+});
+
 // Configure standard email transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
-  auth: { user: process.env.EMAIL, pass: process.env.EMAIL_PASSWORD },
+  auth: { user: process.env.USER, pass: process.env.PASS },
 });
 
-// 2. POST route to send the Cal.com link
+// Send the Cal.com link and SAVE to database
 router.post("/schedule", async (req, res) => {
   const { email } = req.body;
 
@@ -29,8 +40,7 @@ router.post("/schedule", async (req, res) => {
     const client = await User.findOne({ email });
     if (!client) return res.status(404).json({ error: "User not found" });
 
-    // YOUR CAL.COM LINK (Replace 'your-username/15min' with your actual link)
-    const calComUrl = `https://cal.com/your-username/15min?name=${encodeURIComponent(
+    const calComUrl = `https://cal.com/gaurishankar-tjazna/15min?name=${encodeURIComponent(
       client.name || "Client"
     )}&email=${encodeURIComponent(client.email)}`;
 
@@ -48,7 +58,15 @@ router.post("/schedule", async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: "Cal.com link sent successfully!" });
+
+    // 3. SAVE THE MEETING TO THE DATABASE
+    const newMeeting = new Meeting({
+      clientName: client.name || "Client",
+      clientEmail: client.email,
+    });
+    await newMeeting.save();
+
+    res.status(200).json({ message: "Cal.com link sent and meeting logged!" });
 
   } catch (error) {
     console.error(error);
