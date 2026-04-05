@@ -22,6 +22,9 @@ import StatsAndTrust from '../components/StatsAndTrust';
 import FeaturesSection from '../components/FeaturesSection';
 import HowItWorksSection from '../components/HowItWorksSection';
 import CapabilitiesSection from '../components/CapabilitiesSectio';
+import IntegrationsSection from '../components/IntegrationsSection';
+import TestimonialsSection from '../components/TestimonialsSection';
+import PricingSection from '../components/PricingSection';
 
 const Home = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -161,6 +164,9 @@ const Home = () => {
       <FeaturesSection/>
       <HowItWorksSection/>
       <CapabilitiesSection/>
+      <IntegrationsSection/>
+      <TestimonialsSection/>
+      <PricingSection/>
     </>
   );
 };
