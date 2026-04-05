@@ -107,6 +107,7 @@ Userrouter.post("/login", async function (req, res) {
       token,
       message: "logedin",
       userId: checkedUser._id,
+      name: checkedUser.name,
     });
 
 });
