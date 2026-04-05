@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   Search,
   Upload,
@@ -10,29 +10,6 @@ import {
   X,
 } from "lucide-react";
 
-const initialDocuments = [
-  {
-    name: "Initial Complaint - Smith vs Johnson.pdf",
-    id: "DOC-001",
-    type: "Legal Filing",
-    case: "Smith vs. Johnson Corp",
-    size: "2.4 MB",
-    status: "processed",
-    uploaded: "Jan 15, 2024",
-    author: "Sarah Mitchell",
-  },
-  {
-    name: "Contract Agreement - Tech Corp.pdf",
-    id: "DOC-002",
-    type: "Evidence",
-    case: "Tech Corp Patent Infringement",
-    size: "1.8 MB",
-    status: "processed",
-    uploaded: "Jan 18, 2024",
-    author: "Michael Chen",
-  },
-];
-
 const typeColor = {
   "Legal Filing": "bg-green-100 text-green-700",
   Evidence: "bg-blue-100 text-blue-700",
@@ -42,9 +19,10 @@ const typeColor = {
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Documents() {
-  const [documents, setDocuments] = useState(initialDocuments);
+  const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [openDropdownId, setOpenDropdownId] = useState(null);
 
   // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,6 +33,54 @@ export default function Documents() {
   });
 
   const fileInputRef = useRef(null);
+
+  // Fetch Live Documents from Database on Page Load
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/documents`);
+        if (response.ok) {
+          const data = await response.json();
+          const mappedDocs = data.map((doc) => ({
+            _rawId: doc._id,
+            name: doc.title || doc.originalName || "Unknown Document",
+            id: `DOC-${doc._id ? doc._id.toString().slice(-6).toUpperCase() : Date.now().toString().slice(-6)}`,
+            type: doc.documentType || "Uploaded Document",
+            case: doc.caseName || "Unassigned",
+            size: doc.sizeReadable || "Unknown",
+            status: "processed",
+            uploaded: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }) : "Unknown Date",
+            author: doc.uploadedBy || "You",
+            url: doc.cloudinaryUrl,
+          }));
+          setDocuments(mappedDocs);
+        }
+      } catch (error) {
+        console.error("Error fetching live documents:", error);
+      }
+    };
+    fetchDocuments();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this document?")) return;
+    try {
+      const response = await fetch(`${apiUrl}/api/documents/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        setDocuments(prev => prev.filter(d => d._rawId !== id));
+        setOpenDropdownId(null);
+      } else {
+        alert("Failed to delete document. Ensure the backend is running.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error deleting document.");
+    }
+  };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -74,7 +100,7 @@ export default function Documents() {
 
     setUploading(true);
     setIsModalOpen(false);
-    setUploadMessage("Uploading...");
+    setUploadMessage("Uploading & Training AI Model (This may take 30-45 seconds)...");
 
     const dataPayload = new FormData();
     dataPayload.append("file", selectedFile);
@@ -104,11 +130,11 @@ export default function Documents() {
           year: "numeric",
         }),
         author: "You",
-        url: data.secure_url,
+        url: data.document?.cloudinaryUrl,
       };
 
       setDocuments((prev) => [newDocument, ...prev]);
-      setUploadMessage("Upload successful.");
+      setUploadMessage(`Upload Success! AI Status: ${data.ragStatus}`);
     } catch (error) {
       setUploadMessage(error.message);
     } finally {
@@ -198,8 +224,16 @@ export default function Documents() {
       </div>
 
       {uploadMessage && (
-        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm bg-white ${uploadMessage.includes('failed') ? 'border-red-200 text-red-600' : 'border-green-100 text-gray-700'}`}>
-          {uploadMessage}
+        <div className={`mb-4 flex items-center justify-between rounded-lg border px-4 py-3 text-sm shadow-sm bg-white ${uploadMessage.includes('ailed') || uploadMessage.includes('Error') ? 'border-red-200 text-red-600 bg-red-50' : 'border-green-100 text-green-800'}`}>
+          <div className="flex items-center gap-3">
+             {uploadMessage.includes("Training AI") && <Sparkles size={16} className="animate-pulse text-green-500" />}
+             {uploadMessage}
+          </div>
+          {(uploadMessage.includes('Success') || uploadMessage.includes('Error')) && (
+            <button onClick={() => setUploadMessage("")} className="text-gray-400 hover:text-gray-700">
+              <X size={16} />
+            </button>
+          )}
         </div>
       )}
 
@@ -273,8 +307,33 @@ export default function Documents() {
                 <td className="px-6 py-4">
                   <div className="flex justify-center items-center gap-4 text-gray-400">
                     <Sparkles size={18} className="text-green-600 hover:scale-110 transition cursor-pointer" title="AI Analyze" />
-                    <Download size={18} className="hover:text-gray-600 cursor-pointer" />
-                    <MoreVertical size={18} className="hover:text-gray-600 cursor-pointer" />
+                    {doc.url ? (
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                        <Download size={18} className="text-gray-400 hover:text-green-600 cursor-pointer transition" title="Download Document" />
+                      </a>
+                    ) : (
+                      <Download size={18} className="text-gray-200 cursor-not-allowed" title="No Document Attached" />
+                    )}
+                    <div className="relative">
+                      <MoreVertical 
+                        size={18} 
+                        className="hover:text-gray-800 cursor-pointer transition" 
+                        onClick={() => setOpenDropdownId(openDropdownId === doc._rawId ? null : doc._rawId)} 
+                      />
+                      {openDropdownId === doc._rawId && (
+                        <div className="absolute right-0 mt-2 w-32 bg-white border rounded shadow-xl z-50 py-1 overflow-hidden" style={{ minWidth: '140px' }}>
+                          {doc.url && (
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b">Open Document</a>
+                          )}
+                          <button 
+                            onClick={() => handleDelete(doc._rawId)} 
+                            className="w-full text-left block px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                          >
+                            Delete Document
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>

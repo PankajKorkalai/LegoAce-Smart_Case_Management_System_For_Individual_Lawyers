@@ -7,6 +7,7 @@ dotenv.config();
 const connectDB = require("./db/db");
 const uploadRouter = require("./routes/upload");
 const userRouter = require("./routes/user");
+const aiRouter = require("./routes/ai");
 
 connectDB();
 
@@ -23,6 +24,7 @@ app.get("/", (req, res) => {
 
 
 app.use("/api", uploadRouter);
+app.use("/api/ai", aiRouter);
 app.use("/user", userRouter);
 
 const PORT = process.env.PORT || 5000;
