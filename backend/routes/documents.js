@@ -30,7 +30,7 @@ router.get("/documents", async (req, res) => {
   }
 });
 
-// GET document for viewing (inline viewer)
+// GET document - DIRECT VIEW (opens in browser like Qlik)
 router.get("/documents/:id/view", async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -38,24 +38,44 @@ router.get("/documents/:id/view", async (req, res) => {
       return res.status(404).json({ error: "Document not found." });
     }
 
-    let viewUrl;
-    const { mimeType, publicId, resourceType, cloudinaryUrl } = document;
+    // Get file URL from Cloudinary
+    const fileUrl = cloudinary.url(document.publicId, {
+      resource_type: document.resourceType || "auto",
+      secure: true,
+      flags: "attachment",
+    });
 
-    // For PDFs - direct view
+    const { mimeType } = document;
+
+    // For PDFs - serve with proper headers for inline viewing
     if (mimeType === 'application/pdf') {
-      viewUrl = cloudinary.url(publicId, {
-        resource_type: resourceType || "auto",
-        secure: true,
+      // Fetch the PDF from Cloudinary
+      const response = await axios({
+        method: 'GET',
+        url: fileUrl,
+        responseType: 'stream'
       });
-    }
-    // For images - direct view
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      
+      // Stream the PDF directly
+      response.data.pipe(res);
+    } 
+    // For images - serve directly
     else if (mimeType?.startsWith('image/')) {
-      viewUrl = cloudinary.url(publicId, {
-        resource_type: resourceType || "image",
-        secure: true,
+      const response = await axios({
+        method: 'GET',
+        url: fileUrl,
+        responseType: 'stream'
       });
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
+      response.data.pipe(res);
     }
-    // For Word, Excel, PPT - Google Docs Viewer
+    // For Office documents - redirect to Google Docs Viewer (opens in new tab)
     else if (
       mimeType === 'application/msword' ||
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -64,23 +84,30 @@ router.get("/documents/:id/view", async (req, res) => {
       mimeType === 'application/vnd.ms-powerpoint' ||
       mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     ) {
-      const fileUrl = cloudinary.url(publicId, {
-        resource_type: resourceType || "raw",
-        secure: true,
-      });
-      viewUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
-    } else {
-      viewUrl = cloudinaryUrl;
+      const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+      // Return the URL so frontend can open in new tab
+      res.json({ viewUrl: googleViewerUrl, redirect: true });
     }
+    else {
+      // For other files, force download
+      const response = await axios({
+        method: 'GET',
+        url: fileUrl,
+        responseType: 'stream'
+      });
 
-    res.json({ viewUrl, mimeType: document.mimeType });
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.originalName)}"`);
+      response.data.pipe(res);
+    }
+    
   } catch (error) {
     console.error("Failed to get document view:", error);
     res.status(500).json({ error: "Unable to get document view." });
   }
 });
 
-// 🔥 DOWNLOAD document - WORKING SOLUTION 🔥
+// DOWNLOAD document
 router.get("/documents/:id/download", async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -92,6 +119,7 @@ router.get("/documents/:id/download", async (req, res) => {
     const fileUrl = cloudinary.url(document.publicId, {
       resource_type: document.resourceType || "auto",
       secure: true,
+      flags: "attachment",
     });
 
     // Fetch file from Cloudinary
@@ -112,6 +140,33 @@ router.get("/documents/:id/download", async (req, res) => {
   } catch (error) {
     console.error("Download error:", error);
     res.status(500).json({ error: "Unable to download document." });
+  }
+});
+
+// Alternative: Direct Cloudinary URL endpoint (opens in new tab)
+router.get("/documents/:id/open", async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found." });
+    }
+
+    // Get direct Cloudinary URL
+    const fileUrl = cloudinary.url(document.publicId, {
+      resource_type: document.resourceType || "auto",
+      secure: true,
+    });
+
+    // For PDFs, return URL that can be opened directly
+    if (document.mimeType === 'application/pdf') {
+      return res.json({ url: fileUrl });
+    }
+    
+    // For other files, return the Cloudinary URL
+    res.json({ url: fileUrl });
+  } catch (error) {
+    console.error("Failed to get document URL:", error);
+    res.status(500).json({ error: "Unable to get document URL." });
   }
 });
 
