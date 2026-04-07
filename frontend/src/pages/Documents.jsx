@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Upload,
@@ -306,7 +306,6 @@ export default function Documents() {
 
   const handleDownload = async (documentItem) => {
   try {
-    // Create a temporary anchor element
     const link = document.createElement('a');
     link.href = `${apiUrl}/api/documents/${documentItem._id}/download`;
     link.download = documentItem.originalName;
@@ -319,8 +318,36 @@ export default function Documents() {
   }
 };
 
-  const handleOpenDocument = (documentItem) => {
-    setViewerDoc(documentItem);
+  const handleOpenDocument = async (documentItem) => {
+    // For PDFs and images - open in new tab
+    if (documentItem.mimeType === 'application/pdf' || documentItem.mimeType?.startsWith('image/')) {
+      // Open the view endpoint which streams the file
+      window.open(`${apiUrl}/api/documents/${documentItem._id}/view`, '_blank');
+    }
+    // For Office documents - use Google Docs Viewer
+    else if (
+      documentItem.mimeType === 'application/msword' ||
+      documentItem.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      documentItem.mimeType === 'application/vnd.ms-excel' ||
+      documentItem.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      documentItem.mimeType === 'application/vnd.ms-powerpoint' ||
+      documentItem.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ) {
+      try {
+        const response = await fetch(`${apiUrl}/api/documents/${documentItem._id}/view`);
+        const data = await response.json();
+        if (data.redirect && data.viewUrl) {
+          window.open(data.viewUrl, '_blank');
+        }
+      } catch (error) {
+        console.error("Failed to open document:", error);
+        alert("Unable to open document. Please try downloading it instead.");
+      }
+    }
+    else {
+      // For other file types, download instead
+      handleDownload(documentItem);
+    }
   };
 
   const handleDelete = async (documentId) => {

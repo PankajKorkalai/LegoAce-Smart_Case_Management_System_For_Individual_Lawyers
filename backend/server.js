@@ -12,6 +12,7 @@ const aiRouter = require("./routes/ai");
 const clientRouter = require("./routes/client");
 const profileRouter = require("./routes/profile");
 const scheduleRouter = require("./routes/schedule"); 
+const calendarRouter = require("./routes/calendar");
 
 connectDB();
 
@@ -33,6 +34,7 @@ app.use("/user", userRouter);
 app.use("/api", clientRouter);
 app.use("/api", profileRouter);
 app.use("/api/meetings", scheduleRouter); 
+app.use("/api", calendarRouter);
 
 const PORT = process.env.PORT || 5000;
 
