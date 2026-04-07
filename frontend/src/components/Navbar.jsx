@@ -7,13 +7,14 @@ import {
     Settings,
     LogOut,
     MessageSquare,
-    Video
+    Video,
+    Menu
   } from "lucide-react";
   
   import { useState, useRef, useEffect } from "react";
   import { useNavigate } from "react-router-dom";
   
-  export default function Navbar() {
+  export default function Navbar({ onMenuClick }) {
     const [showNotif, setShowNotif] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
   
@@ -87,19 +88,29 @@ import {
     }
   
     return (
-      <div className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white/65 px-6 backdrop-blur-xl backdrop-saturate-150 supports-backdrop-filter:bg-white/55">
+      <div className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white/65 px-4 sm:px-6 backdrop-blur-xl backdrop-saturate-150 supports-backdrop-filter:bg-white/55">
         
-        {/* 🔍 SEARCH */}
-        <div className="flex items-center bg-gray-100 px-3 py-2 rounded-lg w-[400px]">
-          <input
-            type="text"
-            placeholder="Search cases, clients, documents..."
-            className="bg-transparent outline-none text-sm w-full"
-          />
+        <div className="flex items-center gap-4 flex-1">
+          {/* 🍔 MOBILE MENU TOGGLE */}
+          <button 
+            className="p-2 rounded-lg hover:bg-gray-100 lg:hidden text-gray-600"
+            onClick={onMenuClick}
+          >
+            <Menu size={20} />
+          </button>
+
+          {/* 🔍 SEARCH - Responsive Width */}
+          <div className="hidden sm:flex items-center bg-gray-100 px-3 py-2 rounded-lg w-full max-w-[400px]">
+            <input
+              type="text"
+              placeholder="Search cases, clients..."
+              className="bg-transparent outline-none text-sm w-full"
+            />
+          </div>
         </div>
   
         {/* RIGHT SIDE */}
-        <div className="flex items-center gap-5 relative">
+        <div className="flex items-center gap-3 sm:gap-5 relative">
           
           {/* 🌞 THEME */}
           <Sun size={18} className="text-gray-600 cursor-pointer" />

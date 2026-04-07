@@ -121,7 +121,7 @@ import {
         </p>
   
         {/* CARDS */}
-        <div className="grid grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
           <Card title="Active Cases" value="24" sub="+3 from last month" icon={<Briefcase />} color="bg-green-100 text-green-700" />
           <Card title="Total Clients" value="156" sub="+12 new clients" icon={<Users />} color="bg-blue-100 text-blue-600" />
           <Card title="Documents" value="1247" sub="89 pending review" icon={<FileText />} color="bg-yellow-100 text-yellow-600" />
@@ -129,7 +129,7 @@ import {
         </div>
   
         {/* CHARTS */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           <div className="bg-white p-5 rounded-xl shadow-sm">
             <h2 className="font-semibold mb-4">Case Volume Trends</h2>
@@ -168,10 +168,10 @@ import {
         </div>
   
         {/* LOWER SECTION */}
-        <div className="grid grid-cols-3 gap-6 mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
   
           {/* RECENT CASES */}
-          <div className="col-span-2 bg-white p-6 rounded-2xl shadow-sm">
+          <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm overflow-hidden">
             
             <div className="flex justify-between items-center mb-5">
               <h2 className="font-semibold text-[16px]">Recent Cases</h2>
@@ -182,11 +182,11 @@ import {
   
             <div className="space-y-3">
               {cases.map((c, i) => (
-                <div key={i} className="flex justify-between items-center bg-[#f8fafc] px-5 py-4 rounded-xl">
+                <div key={i} className="flex flex-col sm:flex-row justify-between sm:items-center bg-[#f8fafc] px-5 py-4 rounded-xl gap-4 sm:gap-0">
   
                   {/* LEFT */}
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <p className="font-medium text-[14px]">{c.title}</p>
   
                       {/* BADGE */}
@@ -209,7 +209,7 @@ import {
                   </div>
   
                   {/* RIGHT */}
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-[12px] text-gray-500">
                       Next Hearing
                     </p>
@@ -236,7 +236,7 @@ import {
           </div>
   
           {/* EVENTS */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm">
+          <div className="col-span-1 bg-white p-6 rounded-2xl shadow-sm overflow-hidden">
             
             <h2 className="font-semibold text-[16px] mb-5">
               Upcoming Events
@@ -252,15 +252,15 @@ import {
                   </div>
   
                   {/* CONTENT */}
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="text-[14px] font-medium">
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mb-1 gap-1 sm:gap-0">
+                      <p className="text-[14px] font-medium truncate w-full">
                         {e.title}
                       </p>
   
                       {/* BADGE */}
                       <span
-                        className={`text-[11px] px-2 py-[2px] rounded-full font-medium ${
+                        className={`text-[11px] px-2 py-[2px] rounded-full font-medium whitespace-nowrap shrink-0 ${
                           e.tag === "hearing"
                             ? "bg-red-100 text-red-600"
                             : e.tag === "meeting"

@@ -60,10 +60,10 @@ const Login = () => {
   }
 
   return (
-    <div className="h-screen flex">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       
-      {/* LEFT SIDE */}
-      <div className="w-1/2 bg-black text-white p-12 flex flex-col justify-center relative">
+      {/* LEFT SIDE - Hidden on small screens, shown on large screens */}
+      <div className="hidden lg:flex lg:w-1/2 bg-black text-white p-12 flex-col justify-center relative">
         
         {/* subtle grid pattern */}
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]" />
@@ -118,9 +118,9 @@ const Login = () => {
       </div>
 
       {/* RIGHT SIDE */}
-      <div className="w-1/2 flex items-center justify-center bg-gray-50">
+      <div className="w-full lg:w-1/2 min-h-screen flex items-center justify-center bg-gray-50 p-4">
         
-        <div className="w-[420px] bg-white p-8 rounded-xl border border-gray-200">
+        <div className="w-full max-w-[420px] bg-white p-6 sm:p-8 rounded-xl border border-gray-200 shadow-sm">
           
           {/* Heading */}
           <h1 className="text-2xl font-semibold text-center">

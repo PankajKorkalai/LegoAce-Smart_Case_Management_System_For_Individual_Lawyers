@@ -7,6 +7,7 @@ import AppRoutes from "./routes/AppRoutes";
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   // Paths where we want a full page view without the Sidebar and Navbar
@@ -23,23 +24,34 @@ export default function App() {
     location.pathname.startsWith("/p/") ||
     !hasLayout;
 
+  // Handles sidebar toggle from Navbar on mobile
+  const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen relative overflow-x-hidden">
       {!isLayoutBypassed && (
         <Sidebar
           collapsed={sidebarCollapsed}
           onCollapsedChange={setSidebarCollapsed}
+          mobileOpen={isMobileMenuOpen}
+          onMobileClose={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       <div
-        className={`min-h-screen bg-gray-50 transition-[margin] duration-300 ease-out ${
-          isLayoutBypassed ? "ml-0" : sidebarCollapsed ? "ml-20" : "ml-64"
+        className={`min-h-screen bg-gray-50 transition-all duration-300 ease-out ${
+          isLayoutBypassed 
+            ? "ml-0" 
+            : sidebarCollapsed 
+              ? "lg:ml-20 ml-0" 
+              : "lg:ml-64 ml-0"
         }`}
       >
-        {!isLayoutBypassed && <Navbar />}
+        {!isLayoutBypassed && (
+          <Navbar onMenuClick={toggleMobileMenu} />
+        )}
 
-        <div className={isLayoutBypassed ? "" : "p-6"}>
+        <div className={isLayoutBypassed ? "" : "p-4 sm:p-6"}>
           <AppRoutes />
         </div>
       </div>
