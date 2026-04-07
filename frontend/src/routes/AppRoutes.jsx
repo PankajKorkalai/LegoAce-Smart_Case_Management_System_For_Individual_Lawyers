@@ -19,6 +19,29 @@ import Profile from "../pages/Profile";
 import FeedbackPage from "../pages/Feedback";
 import LawyerPublicProfile from "../pages/LawyerPublicProfile";
 
+import { useLocation } from "react-router-dom";
+import { ClientFeedbackForm } from "../pages/Feedback";
+
+function FeedbackFormRoute() {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const caseId = searchParams.get('caseId');
+  const caseName = searchParams.get('caseName');
+  const lawyerName = searchParams.get('lawyerName');
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        <ClientFeedbackForm 
+          caseId={caseId} 
+          caseName={caseName} 
+          lawyerName={lawyerName} 
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -29,6 +52,7 @@ export default function AppRoutes() {
       <Route path="/clients" element={<Clients />} />
       <Route path="/documents" element={<Documents />} />
       <Route path="/feedback" element={<FeedbackPage />} />
+      <Route path="/feedback-form" element={<FeedbackFormRoute />} />
       <Route path="/calendar" element={<Calendar />} />
       <Route path="/video" element={<Video />} />
       <Route path="/settings" element={<Settings />} />

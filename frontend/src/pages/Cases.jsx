@@ -62,6 +62,7 @@ const attorneys = [
 export default function Cases() {
   const [cases, setCases] = useState(initialCases);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCaseId, setEditingCaseId] = useState(null);
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null);
@@ -88,6 +89,34 @@ export default function Cases() {
     whatsapp: false,
   });
 
+  // Fetch cases from backend
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const resp = await axios.get(`${import.meta.env.VITE_API_URL}/user/getcases`);
+        if (resp.data && resp.data.cases) {
+          const fetchedCases = resp.data.cases.map((c) => ({
+            id: c._id || `CASE-${Math.random().toString(36).substr(2, 5)}`,
+            title: c.caseTitle,
+            status: c.status || 'active',
+            priority: c.priority || 'medium',
+            client: c.client,
+            clientEmail: c.clientEmail || "",
+            clientPhone: "+1 (555) 000-0000",
+            type: "General",
+            docs: c.documentsCount || 0,
+            nextHearing: c.nextHearing || "TBD",
+            assigned: c.assignedTo || "Unassigned"
+          }));
+          setCases(fetchedCases);
+        }
+      } catch (error) {
+        console.error("Error fetching cases:", error);
+      }
+    };
+    fetchCases();
+  }, []);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -107,44 +136,66 @@ export default function Cases() {
   };
 
   const handleSubmit = async(e) => {
-    console.log("already hain")
     e.preventDefault();
-    const newCase = {
-      id: `CASE-2024-${String(cases.length + 1).padStart(3, '0')}`,
-      title: formData.caseTitle,
-      status: formData.status,
-      priority: formData.priority,
-      client: formData.client,
-      clientEmail: "client@email.com",
-      clientPhone: "+1 (555) 000-0000",
-      type: "General",
-      docs: 0,
-      nextHearing: "TBD",
-      assigned: formData.assignedTo,
-    };
-    
-    setCases([newCase, ...cases]);
-    setIsModalOpen(false);
-    
-    const resp=await axios.post(`${import.meta.env.VITE_API_URL}/user/addcase`,{
-      caseTitle: formData.caseTitle,
-      client: formData.client,
-      priority: formData.priority,
-      status: formData.status,
-      assignedTo: formData.assignedTo,
-      caseDescription: formData.caseDescription,
-      clientEmail: formData.clientEmail,
-    });
-    console.log("resp ",resp);
+    try {
+      const casePayload = {
+        caseTitle: formData.caseTitle,
+        client: formData.client,
+        priority: formData.priority,
+        status: formData.status,
+        assignedTo: formData.assignedTo,
+        caseDescription: formData.caseDescription,
+        clientEmail: formData.clientEmail || "client@email.com",
+      };
 
-    setFormData({
-      caseTitle: "",
-      client: "",
-      priority: "medium",
-      status: "active",
-      assignedTo: "",
-      caseDescription: "",
-    });
+      let resp;
+      if (editingCaseId) {
+        resp = await axios.put(`${import.meta.env.VITE_API_URL}/user/updatecase/${editingCaseId}`, casePayload);
+      } else {
+        resp = await axios.post(`${import.meta.env.VITE_API_URL}/user/addcase`, casePayload);
+      }
+      
+      if (resp.data && resp.data.case) {
+        const c = resp.data.case;
+        const mappedCase = {
+          id: c._id,
+          title: c.caseTitle,
+          status: c.status || 'active',
+          priority: c.priority || 'medium',
+          client: c.client,
+          clientEmail: c.clientEmail,
+          clientPhone: "+1 (555) 000-0000",
+          type: "General",
+          docs: c.documentsCount || 0,
+          nextHearing: c.nextHearing || "TBD",
+          assigned: c.assignedTo || "Unassigned"
+        };
+        
+        if (editingCaseId) {
+          setCases(cases.map(existing => existing.id === editingCaseId ? mappedCase : existing));
+        } else {
+          setCases([mappedCase, ...cases]);
+        }
+
+        if (c.status === "closed") {
+          console.log("=== FEEDBACK EMAIL DISPATCHED ===");
+          console.log("Backend response: Case closed securely!");
+        }
+      }
+      setIsModalOpen(false);
+      setEditingCaseId(null);
+      setFormData({
+        caseTitle: "",
+        client: "",
+        priority: "medium",
+        status: "active",
+        assignedTo: "",
+        caseDescription: "",
+      });
+    } catch (err) {
+      console.error("Error adding case:", err);
+      alert("Failed to create case.");
+    }
   };
 
   const handleToggleMenu = (caseId, event) => {
@@ -176,7 +227,7 @@ LegalFlow Team`);
     setOpenMenuId(null);
   };
 
-  const handleSendAlert = (e) => {
+  const handleSendAlert = async (e) => {
     e.preventDefault();
     const selectedMethods = Object.keys(sendVia).filter(key => sendVia[key]);
     
@@ -185,29 +236,35 @@ LegalFlow Team`);
       return;
     }
     
-    // Simulate sending alerts
-    console.log("=== SENDING ALERT ===");
-    console.log("To:", selectedCase.client);
-    console.log("Email:", selectedCase.clientEmail);
-    console.log("Phone:", selectedCase.clientPhone);
-    console.log("Subject:", alertSubject);
-    console.log("Message:", alertMessage);
-    console.log("Via:", selectedMethods);
-    
-    // Store sent alert in case object (for demo)
-    const updatedCases = cases.map(c => 
-      c.id === selectedCase.id 
-        ? { ...c, lastAlert: { message: alertSubject, date: new Date().toISOString(), methods: selectedMethods } }
-        : c
-    );
-    setCases(updatedCases);
-    
-    setShowAlertDialog(false);
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
-    setSelectedCase(null);
-    setAlertMessage("");
-    setAlertSubject("");
+    try {
+      if (sendVia.email) {
+        const resp = await axios.post(`${import.meta.env.VITE_API_URL}/user/sendalert`, {
+          email: selectedCase.clientEmail,
+          subject: alertSubject,
+          message: alertMessage
+        });
+        console.log("=== ALERT EMAIL DISPATCHED ===");
+        console.log("Backend response:", resp.data.message);
+      }
+
+      // Store sent alert in case object (for demo)
+      const updatedCases = cases.map(c => 
+        c.id === selectedCase.id 
+          ? { ...c, lastAlert: { message: alertSubject, date: new Date().toISOString(), methods: selectedMethods } }
+          : c
+      );
+      setCases(updatedCases);
+      
+      setShowAlertDialog(false);
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setSelectedCase(null);
+      setAlertMessage("");
+      setAlertSubject("");
+    } catch (error) {
+      console.error("Error sending alert:", error);
+      alert("Failed to send alert via email. Check console for details.");
+    }
   };
 
   const handleViewDetails = (caseItem) => {
@@ -220,6 +277,7 @@ LegalFlow Team`);
   const handleEditCase = (caseItem) => {
     console.log("Edit case:", caseItem);
     setOpenMenuId(null);
+    setEditingCaseId(caseItem.id);
     // Pre-fill form for editing
     setFormData({
       caseTitle: caseItem.title,
@@ -232,12 +290,23 @@ LegalFlow Team`);
     setIsModalOpen(true);
   };
 
-  const handleChangeStatus = (caseItem, newStatus) => {
-    const updatedCases = cases.map(c => 
-      c.id === caseItem.id ? { ...c, status: newStatus } : c
-    );
-    setCases(updatedCases);
-    setOpenMenuId(null);
+  const handleChangeStatus = async (caseItem, newStatus) => {
+    try {
+      const resp = await axios.put(`${import.meta.env.VITE_API_URL}/user/updatestatus/${caseItem.id}`, { status: newStatus });
+      const updatedCases = cases.map(c => 
+        c.id === caseItem.id ? { ...c, status: newStatus } : c
+      );
+      setCases(updatedCases);
+      setOpenMenuId(null);
+      if (newStatus === "closed") {
+        console.log("=== FEEDBACK EMAIL DISPATCHED ===");
+        console.log("Backend response:", resp.data.message);
+        alert("Case closed successfully! A feedback request has been emailed to the client.");
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Failed to update status.");
+    }
   };
 
   const getPriorityColor = (priority) => {
@@ -470,10 +539,10 @@ LegalFlow Team`);
             <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Add New Case</h2>
+                  <h2 className="text-xl font-bold text-gray-900">{editingCaseId ? "Edit Case" : "Add New Case"}</h2>
                   <p className="text-sm text-gray-500 mt-1">Enter the case information to create a new record.</p>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition p-1 rounded-full hover:bg-gray-100">
+                <button onClick={() => { setIsModalOpen(false); setEditingCaseId(null); }} className="text-gray-400 hover:text-gray-600 transition p-1 rounded-full hover:bg-gray-100">
                   <X size={22} />
                 </button>
               </div>
@@ -531,8 +600,8 @@ LegalFlow Team`);
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">Cancel</button>
-                <button type="submit" className="px-5 py-2 text-sm bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium">Create Case</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingCaseId(null); }} className="px-5 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">Cancel</button>
+                <button type="submit" className="px-5 py-2 text-sm bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium">{editingCaseId ? "Save Changes" : "Create Case"}</button>
               </div>
             </form>
           </div>

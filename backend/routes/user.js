@@ -151,20 +151,6 @@ Userrouter.post("/addcase", async (req, res) => {
     }
 
    
-    user.cases.push({
-      caseTitle,
-      client,
-      clientEmail,
-      priority,
-      status,
-      assignedTo,
-      caseDescription,
-      nextHearing,
-      documentsCount,
-    });
-
-    await user.save();
-
     const newcase=await caseModel.create({
         caseTitle,
         client,
@@ -176,7 +162,10 @@ Userrouter.post("/addcase", async (req, res) => {
         nextHearing,
         documentsCount,
         createdBy:user._id
-    })
+    });
+
+    user.cases.push(newcase._id);
+    await user.save();
 
     res.json({
       message: "Case added successfully",
@@ -191,5 +180,102 @@ Userrouter.post("/addcase", async (req, res) => {
   }
 });
 
+Userrouter.get("/getcases", async (req, res) => {
+  try {
+    const cases = await caseModel.find({}).sort({ createdAt: -1 });
+    res.json({ cases });
+  } catch (err) {
+    console.error("Error fetching cases:", err);
+    res.status(500).json({ message: "Failed to fetch cases" });
+  }
+});
+
+const sendFeedbackEmail = require("../utils/sendFeedbackEmail");
+
+Userrouter.put("/updatestatus/:id", async (req, res) => {
+  try {
+    const { status } = req.body;
+    const caseId = req.params.id;
+
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+
+    const updatedCase = await caseModel.findByIdAndUpdate(
+      caseId,
+      { status },
+      { new: true }
+    );
+
+    if (!updatedCase) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    // If status changed to closed, send feedback email
+    if (status.toLowerCase() === "closed") {
+      const clientEmail = updatedCase.clientEmail;
+      if (clientEmail) {
+        // Send email in background
+        sendFeedbackEmail(clientEmail, updatedCase.caseTitle, updatedCase._id, updatedCase.assignedTo)
+          .catch(err => console.error("Failed to send feedback email in background:", err));
+      }
+    }
+
+    res.json({ message: "Status updated successfully", case: updatedCase });
+  } catch (err) {
+    console.error("Error updating status:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+const sendAlertEmail = require("../utils/sendAlertEmail");
+
+Userrouter.post("/sendalert", async (req, res) => {
+  try {
+    const { email, subject, message } = req.body;
+    
+    if (!email || !subject || !message) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    await sendAlertEmail(email, subject, message);
+    
+    res.json({ message: "Alert sent successfully" });
+  } catch (err) {
+    console.error("Error sending alert:", err);
+    res.status(500).json({ message: "Failed to send alert email" });
+  }
+});
+
+Userrouter.put("/updatecase/:id", async (req, res) => {
+  try {
+    const caseId = req.params.id;
+    const updateData = req.body;
+    
+    const updatedCase = await caseModel.findByIdAndUpdate(
+      caseId,
+      updateData,
+      { new: true }
+    );
+
+    if (!updatedCase) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    // Intercept "closed" status and send feedback email
+    if (updateData.status && updateData.status.toLowerCase() === "closed") {
+      const clientEmail = updatedCase.clientEmail;
+      if (clientEmail) {
+        sendFeedbackEmail(clientEmail, updatedCase.caseTitle, updatedCase._id, updatedCase.assignedTo)
+          .catch(err => console.error("Failed to send feedback email in background:", err));
+      }
+    }
+
+    res.json({ message: "Case updated successfully", case: updatedCase });
+  } catch (err) {
+    console.error("Error updating case:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 module.exports=Userrouter;

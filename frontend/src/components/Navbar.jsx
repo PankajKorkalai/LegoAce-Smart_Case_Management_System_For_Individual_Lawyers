@@ -5,7 +5,9 @@ import {
     XCircle,
     User,
     Settings,
-    LogOut
+    LogOut,
+    MessageSquare,
+    Video
   } from "lucide-react";
   
   import { useState, useRef, useEffect } from "react";
@@ -51,31 +53,31 @@ import {
     const notifications = [
       {
         id: 1,
-        title: "New Opportunity Posted",
-        message: 'A new opportunity "test 19" is now available',
-        time: "3/19/26, 3:09 PM",
-        type: "info",
+        title: "Next Hearing Scheduled",
+        message: 'Smith vs. Johnson: Hearing on Feb 15, 2026',
+        time: "Just now",
+        type: "hearing",
       },
       {
         id: 2,
-        title: "Opportunity Removed",
-        message: '"waste" is no longer available',
-        time: "3/19/26, 3:09 PM",
-        type: "info",
+        title: "Case Update",
+        message: 'Davis Property Dispute status changed to Active',
+        time: "2 hours ago",
+        type: "update",
       },
       {
         id: 3,
-        title: "Application Rejected",
-        message: 'Your application for "waste" was rejected',
-        time: "3/19/26, 3:08 PM",
-        type: "error",
+        title: "Feedback Received",
+        message: 'Maria Rodriguez submitted a 5-star review',
+        time: "Yesterday, 3:08 PM",
+        type: "feedback",
       },
       {
         id: 4,
-        title: "Opportunity Updated",
-        message: '"waste" has been updated',
-        time: "3/19/26, 3:05 PM",
-        type: "info",
+        title: "Next Meeting",
+        message: 'Client intake meeting with Robert Davis',
+        time: "Yesterday, 1:00 PM",
+        type: "meeting",
       },
     ];
 
@@ -139,11 +141,11 @@ import {
                     >
                       {/* ICON */}
                       <div className="mt-1">
-                        {item.type === "error" ? (
-                          <XCircle className="text-red-500" size={18} />
-                        ) : (
-                          <Briefcase className="text-yellow-500" size={18} />
-                        )}
+                        {item.type === "hearing" && <Briefcase className="text-blue-500" size={18} />}
+                        {item.type === "update" && <Bell className="text-yellow-500" size={18} />}
+                        {item.type === "feedback" && <MessageSquare className="text-green-500" size={18} />}
+                        {item.type === "meeting" && <Video className="text-purple-500" size={18} />}
+                        {!["hearing", "update", "feedback", "meeting"].includes(item.type) && <Bell className="text-gray-500" size={18} />}
                       </div>
   
                       {/* TEXT */}

@@ -10,7 +10,7 @@ export default function App() {
   const location = useLocation();
 
   // Paths where we want a full page view without the Sidebar and Navbar
-  const bypassLayoutPaths = ["/", "/auth", "/login"];
+  const bypassLayoutPaths = ["/", "/auth", "/login", "/feedback-form"];
   
   const layoutPathsPattern = [
     "/dashboard", "/cases", "/clients", "/documents",

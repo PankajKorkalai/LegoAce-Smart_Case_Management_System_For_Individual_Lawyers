@@ -407,9 +407,30 @@ export default function FeedbackPage() {
                                         <span>{fb.clientEmail}</span>
                                     </div>
                                 </div>
+                                
+                                {/* Extra Ratings Row */}
+                                {(fb.assistanceRating || fb.recommendation) && (
+                                    <div className="flex flex-wrap gap-6 mb-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                        {fb.assistanceRating > 0 && (
+                                            <div className="flex flex-col">
+                                                <span className="text-xs text-gray-500 mb-1">Assistance Rating</span>
+                                                <div className="flex items-center gap-1">
+                                                    {getStarRating(fb.assistanceRating)}
+                                                    <span className="text-xs text-gray-600 ml-1 font-medium">{fb.assistanceRating}.0</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {fb.recommendation && (
+                                            <div className="flex flex-col border-l border-gray-200 pl-6">
+                                                <span className="text-xs text-gray-500 mb-1">Would Recommend?</span>
+                                                <span className="font-semibold text-gray-700">{fb.recommendation}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Feedback Text */}
-                                <p className="text-gray-600 text-sm mb-3 border-l-3 border-green-500 pl-3">
+                                <p className="text-gray-600 text-sm mb-3 border-l-4 border-green-500 pl-3 italic">
                                     "{fb.feedback}"
                                 </p>
 
@@ -535,10 +556,13 @@ export function ClientFeedbackForm({ caseId, caseName, lawyerName, onSubmitted }
     const [formData, setFormData] = useState({
         rating: 0,
         title: "",
+        assistanceRating: 0,
+        recommendation: "",
         feedback: "",
         clientName: "",
         clientEmail: "",
     });
+    const [hoveredAssistanceRating, setHoveredAssistanceRating] = useState(0);
     const [hoveredRating, setHoveredRating] = useState(0);
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState("");
@@ -568,6 +592,8 @@ export function ClientFeedbackForm({ caseId, caseName, lawyerName, onSubmitted }
             clientName: formData.clientName || "Anonymous Client",
             clientEmail: formData.clientEmail || "",
             rating: formData.rating,
+            assistanceRating: formData.assistanceRating,
+            recommendation: formData.recommendation,
             title: formData.title || `Feedback for ${lawyerName}`,
             feedback: formData.feedback,
             date: new Date().toISOString(),
@@ -610,7 +636,7 @@ export function ClientFeedbackForm({ caseId, caseName, lawyerName, onSubmitted }
                 {/* Rating */}
                 <div>
                     <label className="text-sm font-medium text-gray-700 block mb-2">
-                        Your Rating *
+                        Rate your overall experience with our service *
                     </label>
                     <div className="flex items-center gap-2">
                         {[1, 2, 3, 4, 5].map((rating) => (
@@ -632,6 +658,55 @@ export function ClientFeedbackForm({ caseId, caseName, lawyerName, onSubmitted }
                             </button>
                         ))}
                     </div>
+                </div>
+
+                {/* Assistance Rating */}
+                <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-2">
+                        How would you rate the lawyer's assistance and responsiveness?
+                    </label>
+                    <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                            <button
+                                key={`assist-${rating}`}
+                                type="button"
+                                onClick={() => {
+                                    setFormData(prev => ({ ...prev, assistanceRating: rating }));
+                                    setError("");
+                                }}
+                                onMouseEnter={() => setHoveredAssistanceRating(rating)}
+                                onMouseLeave={() => setHoveredAssistanceRating(0)}
+                                className="focus:outline-none transition-transform hover:scale-110"
+                            >
+                                <Star
+                                    size={28}
+                                    className={`${(hoveredAssistanceRating || formData.assistanceRating) >= rating
+                                            ? "fill-yellow-400 text-yellow-400"
+                                            : "text-gray-300"
+                                        } transition`}
+                                />
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Recommendation */}
+                <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">
+                        How likely are you to recommend us to others?
+                    </label>
+                    <select
+                        value={formData.recommendation}
+                        onChange={(e) => setFormData(prev => ({ ...prev, recommendation: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
+                    >
+                        <option value="" disabled>Select an option</option>
+                        <option value="Very Likely">Very Likely</option>
+                        <option value="Likely">Likely</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Unlikely">Unlikely</option>
+                        <option value="Very Unlikely">Very Unlikely</option>
+                    </select>
                 </div>
 
                 {/* Title */}

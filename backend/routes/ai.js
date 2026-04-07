@@ -50,7 +50,7 @@ router.post("/chat", async (req, res) => {
     const relevantChunks = scoredChunks.filter(c => c.score > 0.3);
 
     // 3. Prepare the context for the LLM
-    let contextText = "No direct document context found.";
+    let contextText = "";
     if (relevantChunks && relevantChunks.length > 0) {
       contextText = relevantChunks.map(c => `[Context from document]: ${c.text}`).join("\n\n");
     }
@@ -58,17 +58,17 @@ router.post("/chat", async (req, res) => {
     // 4. Query the LLM
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
-    const megaPrompt = `
-You are a highly intelligent and formal legal AI assistant.
-Answer the user's question using ONLY the provided document context. Do not invent or hallucinate information outside of this context.
-If the answer cannot be found in the context, politely state that you cannot answer based on the current documents.
+    let megaPrompt = `You are a highly intelligent and formal legal AI assistant.\n`;
+    
+    if (contextText) {
+      // If we found relevant chunks, prioritize them but allow general knowledge
+      megaPrompt += `Please answer the user's question primarily using the provided document context below. You may supplement the answer with your general legal knowledge if the context is insufficient but relevant.\n\nCONTEXT:\n${contextText}\n\n`;
+    } else {
+      // If no chunks were found, fallback entirely to Gemini's general knowledge
+      megaPrompt += `No specific user uploaded documents were found for this query. Please answer the user's question using your vast general legal knowledge. Be as helpful and detailed as possible.\n\n`;
+    }
 
-CONTEXT:
-${contextText}
-
-USER QUESTION:
-${message}
-    `;
+    megaPrompt += `USER QUESTION:\n${message}`;
 
     // Note: We use gemini-2.5-flash as the fast and standard text model.
     const response = await ai.models.generateContent({
