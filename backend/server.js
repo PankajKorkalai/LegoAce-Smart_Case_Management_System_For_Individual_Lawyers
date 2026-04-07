@@ -6,9 +6,13 @@ dotenv.config();
 
 const connectDB = require("./db/db");
 const uploadRouter = require("./routes/upload");
+const documentsRouter = require("./routes/documents");
 const userRouter = require("./routes/user");
-// 1. ADD THIS IMPORT
+const aiRouter = require("./routes/ai");
+const clientRouter = require("./routes/client");
+const profileRouter = require("./routes/profile");
 const scheduleRouter = require("./routes/schedule"); 
+const calendarRouter = require("./routes/calendar");
 
 connectDB();
 
@@ -24,9 +28,13 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api", uploadRouter);
+app.use("/api/ai", aiRouter);
+app.use("/api", documentsRouter);
 app.use("/user", userRouter);
-// 2. MOUNT THE NEW ROUTER
+app.use("/api", clientRouter);
+app.use("/api", profileRouter);
 app.use("/api/meetings", scheduleRouter); 
+app.use("/api", calendarRouter);
 
 const PORT = process.env.PORT || 5000;
 
