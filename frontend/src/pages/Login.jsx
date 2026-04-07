@@ -21,7 +21,8 @@ const Login = () => {
         email:mail,
         password
       });
-      if(resp.data.message==="User_not_exists"){
+      console.log("resp ",resp);
+      if(resp.data.message!=="logedin"){
         alert("Invalid email or password. Please try again.");
         return;
       } else{

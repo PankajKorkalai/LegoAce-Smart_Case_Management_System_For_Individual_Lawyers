@@ -69,6 +69,10 @@ Userrouter.post("/login", async function (req, res) {
     password: z.string().min(5).max(100),
   });
 
+  console.log("login api called");
+  console.log("body ", req.body);
+
+
   const checkdata = requiredatas.safeParse(req.body);
   if (!checkdata.success) {
     return res.json({ message: checkdata.error });
@@ -83,6 +87,8 @@ Userrouter.post("/login", async function (req, res) {
     if (!checkedUser) {
       return res.json({ message: "User_not_exists" });
     }
+
+    console.log("checked user ", checkedUser);
 
     const finduser = await bcrypt.compare(password, checkedUser.password);
 
