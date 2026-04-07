@@ -22,19 +22,24 @@ const typeColor = {
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// Document Viewer Component (inline)
-function DocumentViewer({ document, onClose, onDownload }) {
+// ─── Document Viewer Component ────────────────────────────────────────────────
+function DocumentViewer({ document: doc, onClose, onDownload }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [viewUrl, setViewUrl] = useState("");
+  const [viewData, setViewData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const fetchViewUrl = async () => {
       try {
-        const response = await fetch(`${apiUrl}/api/documents/${document._id}/view`);
+        const response = await fetch(`${apiUrl}/api/documents/${doc._id}/view`);
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to get document URL.");
+        }
         const data = await response.json();
-        setViewUrl(data.viewUrl);
+        setViewData(data);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -42,104 +47,110 @@ function DocumentViewer({ document, onClose, onDownload }) {
       }
     };
     fetchViewUrl();
-  }, [document._id]);
+  }, [doc._id]);
 
   const toggleFullscreen = () => {
-    const elem = document.getElementById('document-viewer-container');
     if (!isFullscreen) {
-      elem?.requestFullscreen();
+      containerRef.current?.requestFullscreen();
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen();
+      globalThis.document.exitFullscreen();
       setIsFullscreen(false);
     }
   };
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    const handleFSChange = () => {
+      setIsFullscreen(!!globalThis.document.fullscreenElement);
     };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    globalThis.document.addEventListener("fullscreenchange", handleFSChange);
+    return () =>
+      globalThis.document.removeEventListener("fullscreenchange", handleFSChange);
   }, []);
 
-  const getEmbedCode = () => {
-    const { mimeType } = document;
-    
-    // For PDF
-    if (mimeType === 'application/pdf') {
+  const renderContent = () => {
+    if (!viewData) return null;
+    const { viewUrl, type } = viewData;
+
+    if (type === "pdf") {
       return (
         <iframe
           src={`${viewUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-          className="w-full h-full"
-          title={document.title}
+          className="w-full h-full border-0"
+          title={doc.title || doc.originalName}
         />
       );
     }
-    
-    // For Images
-    if (mimeType?.startsWith('image/')) {
+
+    if (type === "image") {
       return (
-        <img 
-          src={viewUrl} 
-          alt={document.title}
-          className="max-w-full max-h-full object-contain mx-auto"
+        <div className="flex items-center justify-center h-full">
+          <img
+            src={viewUrl}
+            alt={doc.title || doc.originalName}
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+      );
+    }
+
+    if (type === "office") {
+      return (
+        <iframe
+          src={viewUrl}
+          className="w-full h-full border-0"
+          title={doc.title || doc.originalName}
         />
       );
     }
-    
-    // For Word, Excel, PPT using Google Docs Viewer
+
     return (
-      <iframe
-        src={viewUrl}
-        className="w-full h-full"
-        title={document.title}
-        allow="autoplay"
-      />
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center text-white">
+          <FileText size={48} className="mx-auto mb-4 text-gray-400" />
+          <p className="text-lg mb-2">Preview not available for this file type</p>
+          <p className="text-sm text-gray-400 mb-4">{doc.mimeType}</p>
+          <button
+            onClick={() => onDownload(doc)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Download File
+          </button>
+        </div>
+      </div>
     );
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
-      {/* Header */}
-      <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between">
+      <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-800 rounded-lg transition"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg transition" title="Close">
             <X size={20} />
           </button>
           <div>
-            <h3 className="font-medium text-sm">{document.title || document.originalName}</h3>
-            <p className="text-xs text-gray-400">{document.sizeReadable} • {document.documentType}</p>
+            <h3 className="font-medium text-sm">{doc.title || doc.originalName}</h3>
+            <p className="text-xs text-gray-400">
+              {doc.sizeReadable} · {doc.documentType}
+            </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => onDownload(document)}
-            className="p-2 hover:bg-gray-800 rounded-lg transition"
-            title="Download"
-          >
+          <button onClick={() => onDownload(doc)} className="p-2 hover:bg-gray-800 rounded-lg transition" title="Download">
             <Download size={18} />
           </button>
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 hover:bg-gray-800 rounded-lg transition"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-          >
+          <button onClick={toggleFullscreen} className="p-2 hover:bg-gray-800 rounded-lg transition" title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
             {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
         </div>
       </div>
 
-      {/* Viewer Body */}
-      <div id="document-viewer-container" className="flex-1 bg-gray-800 p-4">
+      <div ref={containerRef} className="flex-1 bg-gray-800 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4" />
               <p className="text-white">Loading document...</p>
             </div>
           </div>
@@ -147,23 +158,21 @@ function DocumentViewer({ document, onClose, onDownload }) {
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-red-400">
               <p className="text-lg mb-2">Failed to load document</p>
-              <p className="text-sm">{error}</p>
-              <button
-                onClick={() => window.open(document.cloudinaryUrl, '_blank')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Open in New Tab
+              <p className="text-sm mb-4">{error}</p>
+              <button onClick={() => onDownload(doc)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Download Instead
               </button>
             </div>
           </div>
         ) : (
-          getEmbedCode()
+          renderContent()
         )}
       </div>
     </div>
   );
 }
 
+// ─── Main Documents Component ─────────────────────────────────────────────────
 export default function Documents() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -171,7 +180,6 @@ export default function Documents() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [viewerDoc, setViewerDoc] = useState(null);
 
-  // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [formData, setFormData] = useState({
@@ -183,12 +191,17 @@ export default function Documents() {
   const [filterType, setFilterType] = useState("All Types");
   const [filterCase, setFilterCase] = useState("All Cases");
   const [viewMode, setViewMode] = useState("list");
+
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisDoc, setAnalysisDoc] = useState(null);
+
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -204,14 +217,10 @@ export default function Documents() {
   const fetchDocuments = async () => {
     setLoading(true);
     setUploadMessage("");
-
     try {
       const response = await fetch(`${apiUrl}/api/documents`);
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to load documents.");
-      }
+      if (!response.ok) throw new Error(data.error || "Failed to load documents.");
       setDocuments(data);
     } catch (error) {
       setUploadMessage(error.message);
@@ -225,9 +234,7 @@ export default function Documents() {
     fetchDocuments();
   }, []);
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleUploadClick = () => fileInputRef.current?.click();
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -238,27 +245,25 @@ export default function Documents() {
 
   const confirmUpload = async () => {
     if (!selectedFile) return;
-
     setUploading(true);
     setIsModalOpen(false);
     setUploadMessage("Uploading...");
 
-    const dataPayload = new FormData();
-    dataPayload.append("file", selectedFile);
-    dataPayload.append("caseName", formData.caseName);
-    dataPayload.append("documentType", formData.docType);
+    const payload = new FormData();
+    payload.append("file", selectedFile);
+    payload.append("caseName", formData.caseName);
+    payload.append("documentType", formData.docType);
 
     try {
       const response = await fetch(`${apiUrl}/api/upload`, {
         method: "POST",
-        body: dataPayload,
+        body: payload,
       });
       const data = await response.json();
-
       if (!response.ok) throw new Error(data.error || "Upload failed");
 
       setDocuments((prev) => [data.document, ...prev]);
-      setUploadMessage(`Upload Success! AI Status: ${data.ragStatus || "Upload successful."}`);
+      setUploadMessage(`Upload successful! AI Status: ${data.ragStatus || "Processed"}`);
       setTimeout(() => setUploadMessage(""), 5000);
     } catch (error) {
       setUploadMessage(error.message);
@@ -272,20 +277,17 @@ export default function Documents() {
   };
 
   const handleAnalyze = async (documentId) => {
+    const doc = documents.find((d) => d._id === documentId);
+    setAnalysisDoc(doc || null);
     setAnalysisOpen(true);
     setAnalysisLoading(true);
     setAnalysisResult(null);
-    const doc = documents.find((doc) => doc._id === documentId);
-    setAnalysisDoc(doc || null);
+    setActiveMenuId(null);
 
     try {
       const response = await fetch(`${apiUrl}/api/documents/${documentId}/analyze`);
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Document analysis failed.");
-      }
-
+      if (!response.ok) throw new Error(data.error || "Document analysis failed.");
       setAnalysisResult(data.analysis);
     } catch (error) {
       setAnalysisResult({ error: error.message });
@@ -300,107 +302,86 @@ export default function Documents() {
     setAnalysisResult(null);
   };
 
-  const getDocumentUrl = (documentItem) => {
-    return documentItem.signedUrl || documentItem.cloudinaryUrl;
-  };
-
+  // Modern Blob Download - completely bypasses browser native routing issues
   const handleDownload = async (documentItem) => {
-  try {
-    const link = document.createElement('a');
-    link.href = `${apiUrl}/api/documents/${documentItem._id}/download`;
-    link.download = documentItem.originalName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (error) {
-    console.error("Download error:", error);
-    alert("Download failed. Please try again.");
-  }
-};
+    try {
+      setUploadMessage(`Preparing download for ${documentItem.originalName}...`);
+      const response = await fetch(`${apiUrl}/api/documents/${documentItem._id}/download`);
+      if (!response.ok) throw new Error("Download failed");
 
-  const handleOpenDocument = async (documentItem) => {
-    // For PDFs and images - open in new tab
-    if (documentItem.mimeType === 'application/pdf' || documentItem.mimeType?.startsWith('image/')) {
-      // Open the view endpoint which streams the file
-      window.open(`${apiUrl}/api/documents/${documentItem._id}/view`, '_blank');
-    }
-    // For Office documents - use Google Docs Viewer
-    else if (
-      documentItem.mimeType === 'application/msword' ||
-      documentItem.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      documentItem.mimeType === 'application/vnd.ms-excel' ||
-      documentItem.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      documentItem.mimeType === 'application/vnd.ms-powerpoint' ||
-      documentItem.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-    ) {
-      try {
-        const response = await fetch(`${apiUrl}/api/documents/${documentItem._id}/view`);
-        const data = await response.json();
-        if (data.redirect && data.viewUrl) {
-          window.open(data.viewUrl, '_blank');
-        }
-      } catch (error) {
-        console.error("Failed to open document:", error);
-        alert("Unable to open document. Please try downloading it instead.");
-      }
-    }
-    else {
-      // For other file types, download instead
-      handleDownload(documentItem);
+      const blob = await response.blob();
+      const url = globalThis.window.URL.createObjectURL(blob);
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = documentItem.originalName;
+      globalThis.document.body.appendChild(link);
+      link.click();
+      globalThis.document.body.removeChild(link);
+      globalThis.window.URL.revokeObjectURL(url);
+      setUploadMessage("");
+    } catch (error) {
+      console.error(error);
+      setUploadMessage("Failed to download document.");
+      setTimeout(() => setUploadMessage(""), 3000);
     }
   };
 
-  const handleDelete = async (documentId) => {
-    const confirmed = window.confirm("Delete this document permanently?");
-    if (!confirmed) return;
+  const handleOpenDocument = (documentItem) => {
+    setViewerDoc(documentItem);
+    setActiveMenuId(null);
+  };
 
+  const handleDeleteConfirm = (docId) => {
+    setDeleteConfirmId(docId);
+    setActiveMenuId(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
+    setDeleting(true);
     try {
-      const response = await fetch(`${apiUrl}/api/documents/${documentId}`, {
+      const response = await fetch(`${apiUrl}/api/documents/${deleteConfirmId}`, {
         method: "DELETE",
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Delete failed.");
-      }
-
-      setDocuments((prev) => prev.filter((doc) => doc._id !== documentId));
-      setUploadMessage("Document deleted.");
-      setActiveMenuId(null);
+      if (!response.ok) throw new Error(data.error || "Delete failed.");
+      setDocuments((prev) => prev.filter((d) => d._id !== deleteConfirmId));
+      setUploadMessage("Document deleted successfully.");
       setTimeout(() => setUploadMessage(""), 3000);
     } catch (error) {
       setUploadMessage(error.message);
       setTimeout(() => setUploadMessage(""), 3000);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmId(null);
     }
   };
 
   const handleToggleMenu = (docId, event) => {
-    if (event) {
-      event.stopPropagation();
-      const button = event.currentTarget;
-      const rect = button.getBoundingClientRect();
-      setMenuPosition({
-        top: rect.bottom + window.scrollY + 5,
-        right: window.innerWidth - rect.right + 10,
-      });
-    }
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenuPosition({
+      top: rect.bottom + window.scrollY + 5,
+      right: window.innerWidth - rect.right + 10,
+    });
     setActiveMenuId((prev) => (prev === docId ? null : docId));
   };
 
-  // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (activeMenuId !== null) {
-        setActiveMenuId(null);
-      }
+    const handleClickOutside = () => {
+      if (activeMenuId !== null) setActiveMenuId(null);
     };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    globalThis.document.addEventListener("click", handleClickOutside);
+    return () =>
+      globalThis.document.removeEventListener("click", handleClickOutside);
   }, [activeMenuId]);
 
   const filterOptions = (items, field) => {
     const values = items.map((item) => item[field] || "Unassigned");
-    return [`All ${field === "documentType" ? "Types" : "Cases"}`, ...new Set(values)];
+    return [
+      `All ${field === "documentType" ? "Types" : "Cases"}`,
+      ...new Set(values),
+    ];
   };
 
   const filteredDocuments = documents.filter((doc) => {
@@ -409,10 +390,10 @@ export default function Documents() {
       .join(" ")
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-
-    const matchesType = filterType === "All Types" || doc.documentType === filterType;
-    const matchesCase = filterCase === "All Cases" || doc.caseName === filterCase;
-
+    const matchesType =
+      filterType === "All Types" || doc.documentType === filterType;
+    const matchesCase =
+      filterCase === "All Cases" || doc.caseName === filterCase;
     return matchesSearch && matchesType && matchesCase;
   });
 
@@ -428,7 +409,6 @@ export default function Documents() {
         onChange={handleFileChange}
       />
 
-      {/* Document Viewer Modal */}
       {viewerDoc && (
         <DocumentViewer
           document={viewerDoc}
@@ -437,37 +417,90 @@ export default function Documents() {
         />
       )}
 
-      {/* Upload Modal */}
+      {deleteConfirmId && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Delete Document?
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              This will permanently remove the document from storage and the
+              database. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 border border-gray-200 rounded-lg py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-red-600 rounded-lg py-2 text-sm font-medium text-white hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center px-6 py-4 border-b">
               <h3 className="font-bold text-lg">Document Details</h3>
-              <button onClick={() => setIsModalOpen(false)} className="hover:bg-gray-100 p-1 rounded"><X size={20} /></button>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="hover:bg-gray-100 p-1 rounded"
+              >
+                <X size={20} />
+              </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Selected File:</p>
-                <p className="text-sm font-medium truncate bg-gray-50 p-2 rounded border">{selectedFile?.name}</p>
+                <p className="text-sm font-medium truncate bg-gray-50 p-2 rounded border">
+                  {selectedFile?.name}
+                </p>
               </div>
-
               <div>
-                <label className="block text-sm font-medium mb-1">Case Name / Parties</label>
+                <label className="block text-sm font-medium mb-1">
+                  Case Name / Parties
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Smith vs. Johnson"
                   className="w-full border rounded-lg px-3 py-2 outline-green-600"
                   value={formData.caseName}
-                  onChange={(e) => setFormData({ ...formData, caseName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, caseName: e.target.value })
+                  }
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium mb-1">Document Type</label>
+                <label className="block text-sm font-medium mb-1">
+                  Document Type
+                </label>
                 <select
                   className="w-full border rounded-lg px-3 py-2 outline-green-600"
                   value={formData.docType}
-                  onChange={(e) => setFormData({ ...formData, docType: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, docType: e.target.value })
+                  }
                 >
                   <option value="Legal Filing">Legal Filing</option>
                   <option value="Evidence">Evidence</option>
@@ -475,7 +508,6 @@ export default function Documents() {
                   <option value="Uploaded Document">Other</option>
                 </select>
               </div>
-
               <button
                 onClick={confirmUpload}
                 disabled={uploading}
@@ -488,65 +520,96 @@ export default function Documents() {
         </div>
       )}
 
-      {/* Analysis Modal */}
       {analysisOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={handleCloseAnalysis}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={handleCloseAnalysis}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
                 <h2 className="text-xl font-semibold">AI Document Analysis</h2>
-                <p className="text-sm text-gray-500">{analysisDoc?.title || analysisDoc?.originalName}</p>
+                <p className="text-sm text-gray-500">
+                  {analysisDoc?.title || analysisDoc?.originalName}
+                </p>
               </div>
-              <button onClick={handleCloseAnalysis} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 p-1 rounded">
+              <button
+                onClick={handleCloseAnalysis}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 p-1 rounded"
+              >
                 <X size={22} />
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
               {analysisLoading ? (
                 <div className="text-center py-12">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mb-4"></div>
-                  <p className="text-gray-500">Analyzing document, please wait...</p>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mb-4" />
+                  <p className="text-gray-500">
+                    Analyzing document with AI, please wait...
+                  </p>
                 </div>
               ) : analysisResult ? (
-                <div className="space-y-4 text-sm text-gray-700">
+                <div className="space-y-5 text-sm text-gray-700">
                   {analysisResult.error ? (
                     <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-red-700">
                       {analysisResult.error}
                     </div>
                   ) : (
                     <>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2 text-base">Summary</h3>
-                        <p className="text-gray-700 leading-relaxed">{analysisResult.summary}</p>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2 text-base">Key Points</h3>
-                        <ul className="list-disc list-inside space-y-1">
-                          {analysisResult.keyPoints?.map((point, idx) => (
-                            <li key={idx} className="text-gray-700">{point}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2 text-base">Recommendations</h3>
-                        <ul className="list-disc list-inside space-y-1">
-                          {analysisResult.recommendations?.map((rec, idx) => (
-                            <li key={idx} className="text-gray-700">{rec}</li>
-                          ))}
-                        </ul>
-                      </div>
+                      {analysisResult.summary && (
+                        <div>
+                          <h3 className="font-semibold text-gray-900 mb-2 text-base">
+                            Summary
+                          </h3>
+                          <p className="text-gray-700 leading-relaxed">
+                            {analysisResult.summary}
+                          </p>
+                        </div>
+                      )}
+                      {analysisResult.keyPoints?.length > 0 && (
+                        <div>
+                          <h3 className="font-semibold text-gray-900 mb-2 text-base">
+                            Key Points
+                          </h3>
+                          <ul className="list-disc list-inside space-y-1">
+                            {analysisResult.keyPoints.map((point, idx) => (
+                              <li key={idx} className="text-gray-700">
+                                {point}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {analysisResult.recommendations?.length > 0 && (
+                        <div>
+                          <h3 className="font-semibold text-gray-900 mb-2 text-base">
+                            Recommendations
+                          </h3>
+                          <ul className="list-disc list-inside space-y-1">
+                            {analysisResult.recommendations.map((rec, idx) => (
+                              <li key={idx} className="text-gray-700">
+                                {rec}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">No analysis data available.</div>
+                <div className="text-center py-12 text-gray-500">
+                  No analysis data available.
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Documents</h1>
@@ -554,7 +617,6 @@ export default function Documents() {
             Manage, organize, and analyze your legal documents with AI
           </p>
         </div>
-
         <button
           onClick={handleUploadClick}
           disabled={uploading}
@@ -566,16 +628,18 @@ export default function Documents() {
       </div>
 
       {uploadMessage && (
-        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm ${
-          uploadMessage.includes('failed') || uploadMessage.includes('Unable') 
-            ? 'border-red-200 text-red-600 bg-red-50' 
-            : 'border-green-100 text-green-700 bg-green-50'
-        }`}>
+        <div
+          className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm ${uploadMessage.toLowerCase().includes("fail") ||
+            uploadMessage.toLowerCase().includes("error") ||
+            uploadMessage.toLowerCase().includes("unable")
+            ? "border-red-200 text-red-600 bg-red-50"
+            : "border-green-100 text-green-700 bg-green-50"
+            }`}
+        >
           {uploadMessage}
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center mb-6">
         <div className="flex items-center bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 flex-1">
           <Search size={16} className="text-gray-400 mr-2" />
@@ -592,8 +656,10 @@ export default function Documents() {
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
-          {typeOptions.map((typeOption) => (
-            <option key={typeOption} value={typeOption}>{typeOption}</option>
+          {typeOptions.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
           ))}
         </select>
         <select
@@ -601,51 +667,69 @@ export default function Documents() {
           value={filterCase}
           onChange={(e) => setFilterCase(e.target.value)}
         >
-          {caseOptions.map((caseOption) => (
-            <option key={caseOption} value={caseOption}>{caseOption}</option>
+          {caseOptions.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
         </select>
         <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <button
             onClick={() => setViewMode("list")}
-            className={`p-2 transition ${viewMode === "list" ? "bg-gray-100" : "hover:bg-gray-50"}`}
+            className={`p-2 transition ${viewMode === "list" ? "bg-gray-100" : "hover:bg-gray-50"
+              }`}
           >
             <List size={16} />
           </button>
           <button
             onClick={() => setViewMode("grid")}
-            className={`p-2 transition ${viewMode === "grid" ? "bg-gray-100" : "hover:bg-gray-50"}`}
+            className={`p-2 transition ${viewMode === "grid" ? "bg-gray-100" : "hover:bg-gray-50"
+              }`}
           >
             <Grid size={16} />
           </button>
         </div>
       </div>
 
-      {/* Grid View */}
       {viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {loading ? (
-            <div className="col-span-full p-8 text-center text-gray-500">Loading documents...</div>
+            <div className="col-span-full p-8 text-center text-gray-500">
+              Loading documents...
+            </div>
           ) : filteredDocuments.length === 0 ? (
-            <div className="col-span-full p-8 text-center text-gray-500">No documents found.</div>
+            <div className="col-span-full p-8 text-center text-gray-500">
+              No documents found.
+            </div>
           ) : (
             filteredDocuments.map((doc) => (
-              <div key={doc._id} className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm relative">
+              <div
+                key={doc._id}
+                className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm relative"
+              >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-gray-400">{doc.documentType}</p>
-                    <h3 className="mt-3 text-base font-semibold text-gray-900 truncate">{doc.title || doc.originalName}</h3>
-                    <p className="mt-2 text-sm text-gray-500 truncate">{doc.caseName || "No case assigned"}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
+                      {doc.documentType}
+                    </p>
+                    <h3 className="mt-3 text-base font-semibold text-gray-900 truncate">
+                      {doc.title || doc.originalName}
+                    </h3>
+                    <p className="mt-2 text-sm text-gray-500 truncate">
+                      {doc.caseName || "No case assigned"}
+                    </p>
                   </div>
-                  <button 
-                    onClick={(e) => handleToggleMenu(doc._id, e)} 
-                    className="text-gray-400 hover:text-gray-700"
+                  <button
+                    onClick={(e) => handleToggleMenu(doc._id, e)}
+                    className="text-gray-400 hover:text-gray-700 shrink-0"
                   >
                     <MoreVertical size={20} />
                   </button>
                 </div>
 
-                <p className="mt-4 text-sm text-gray-500">{doc.sizeReadable} · {formatDate(doc.createdAt)}</p>
+                <p className="mt-4 text-sm text-gray-500">
+                  {doc.sizeReadable} · {formatDate(doc.createdAt)}
+                </p>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button
@@ -670,35 +754,11 @@ export default function Documents() {
                     View
                   </button>
                 </div>
-
-                {activeMenuId === doc._id && (
-                  <div 
-                    className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
-                    style={{
-                      top: `${menuPosition.top}px`,
-                      right: `${menuPosition.right}px`,
-                    }}
-                  >
-                    <button
-                      onClick={() => { handleOpenDocument(doc); setActiveMenuId(null); }}
-                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
-                    >
-                      View document
-                    </button>
-                    <button
-                      onClick={() => { handleDelete(doc._id); }}
-                      className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-gray-50 transition"
-                    >
-                      Delete document
-                    </button>
-                  </div>
-                )}
               </div>
             ))
           )}
         </div>
       ) : (
-        /* List View */
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -715,53 +775,90 @@ export default function Documents() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Loading documents...</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    Loading documents...
+                  </td>
                 </tr>
               ) : filteredDocuments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">No documents found.</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    No documents found.
+                  </td>
                 </tr>
               ) : (
                 filteredDocuments.map((doc) => (
                   <tr key={doc._id} className="hover:bg-gray-50/50 transition group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl shrink-0 group-hover:bg-white border transition">📄</div>
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl shrink-0 group-hover:bg-white border transition">
+                          📄
+                        </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-900 truncate max-w-[180px]">{doc.title || doc.originalName}</p>
-                          <p className="text-[10px] text-gray-400 font-mono uppercase">{doc._id.slice(-8)}</p>
+                          <p className="font-medium text-gray-900 truncate max-w-[180px]">
+                            {doc.title || doc.originalName}
+                          </p>
+                          <p className="text-[10px] text-gray-400 font-mono uppercase">
+                            {doc._id.slice(-8)}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded ${typeColor[doc.documentType] || "bg-gray-100 text-gray-700"}`}>
+                      <span
+                        className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded ${typeColor[doc.documentType] ||
+                          "bg-gray-100 text-gray-700"
+                          }`}
+                      >
                         {doc.documentType}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 italic">{doc.caseName || "-"}</td>
-                    <td className="px-4 py-4 text-sm text-gray-500">{doc.sizeReadable}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600 italic">
+                      {doc.caseName || "-"}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-500">
+                      {doc.sizeReadable}
+                    </td>
                     <td className="px-4 py-4">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                         {doc.status || "Processed"}
                       </span>
                     </td>
                     <td className="px-4 py-4 leading-tight">
-                      <p className="text-sm font-medium text-gray-700">{formatDate(doc.createdAt)}</p>
-                      <p className="text-xs text-gray-400">{doc.uploadedBy || "User"}</p>
+                      <p className="text-sm font-medium text-gray-700">
+                        {formatDate(doc.createdAt)}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {doc.uploadedBy || "User"}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center items-center gap-3 text-gray-400">
-                        <button onClick={() => handleAnalyze(doc._id)} className="hover:text-gray-700 transition" title="Analyze document">
+                        <button
+                          onClick={() => handleAnalyze(doc._id)}
+                          className="hover:text-green-600 transition"
+                          title="Analyze document"
+                        >
                           <Sparkles size={18} />
                         </button>
-                        <button onClick={() => handleDownload(doc)} className="hover:text-gray-700 transition" title="Download document">
+                        <button
+                          onClick={() => handleDownload(doc)}
+                          className="hover:text-blue-600 transition"
+                          title="Download document"
+                        >
                           <Download size={18} />
                         </button>
+                        <button
+                          onClick={() => handleOpenDocument(doc)}
+                          className="hover:text-gray-700 transition"
+                          title="View document"
+                        >
+                          <FileText size={18} />
+                        </button>
                         <div className="relative">
-                          <button 
-                            onClick={(e) => handleToggleMenu(doc._id, e)} 
-                            className="hover:text-gray-700 transition" 
+                          <button
+                            onClick={(e) => handleToggleMenu(doc._id, e)}
+                            className="hover:text-gray-700 transition"
                             title="More actions"
                           >
                             <MoreVertical size={18} />
@@ -777,29 +874,39 @@ export default function Documents() {
         </div>
       )}
 
-      {/* Global Menu Dropdown */}
       {activeMenuId && (
-        <div 
+        <div
           className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
-          style={{
-            top: `${menuPosition.top}px`,
-            right: `${menuPosition.right}px`,
-          }}
+          style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+          onClick={(e) => e.stopPropagation()}
         >
           {(() => {
-            const doc = documents.find(d => d._id === activeMenuId);
+            const doc = documents.find((d) => d._id === activeMenuId);
             if (!doc) return null;
             return (
               <>
                 <button
-                  onClick={() => { handleOpenDocument(doc); setActiveMenuId(null); }}
+                  onClick={() => handleOpenDocument(doc)}
                   className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
                 >
                   View document
                 </button>
                 <button
-                  onClick={() => { handleDelete(doc._id); }}
-                  className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-gray-50 transition"
+                  onClick={() => handleAnalyze(doc._id)}
+                  className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Analyze document
+                </button>
+                <button
+                  onClick={() => handleDownload(doc)}
+                  className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Download
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={() => handleDeleteConfirm(doc._id)}
+                  className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition"
                 >
                   Delete document
                 </button>
