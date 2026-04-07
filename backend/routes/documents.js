@@ -3,14 +3,15 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const Document = require("../models/Documents.model");
 const axios = require("axios");
+const { GoogleGenerativeAI } = require("@google/generative-ai"); // Standardized SDK
 
 const router = express.Router();
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
 cloudinary.config({
@@ -19,7 +20,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// GET all documents
+// ─── GET all documents ────────────────────────────────────────────────────────
 router.get("/documents", async (req, res) => {
   try {
     const documents = await Document.find().sort({ createdAt: -1 });
@@ -30,7 +31,7 @@ router.get("/documents", async (req, res) => {
   }
 });
 
-// GET document - DIRECT VIEW (opens in browser like Qlik)
+// ─── GET /documents/:id/view  →  always returns JSON { viewUrl, type } ────────
 router.get("/documents/:id/view", async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -38,76 +39,45 @@ router.get("/documents/:id/view", async (req, res) => {
       return res.status(404).json({ error: "Document not found." });
     }
 
-    // Get file URL from Cloudinary
     const fileUrl = cloudinary.url(document.publicId, {
       resource_type: document.resourceType || "auto",
       secure: true,
-      flags: "attachment",
     });
 
     const { mimeType } = document;
 
-    // For PDFs - serve with proper headers for inline viewing
-    if (mimeType === 'application/pdf') {
-      // Fetch the PDF from Cloudinary
-      const response = await axios({
-        method: 'GET',
-        url: fileUrl,
-        responseType: 'stream'
-      });
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      
-      // Stream the PDF directly
-      response.data.pipe(res);
-    } 
-    // For images - serve directly
-    else if (mimeType?.startsWith('image/')) {
-      const response = await axios({
-        method: 'GET',
-        url: fileUrl,
-        responseType: 'stream'
-      });
-
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
-      response.data.pipe(res);
+    if (mimeType === "application/pdf") {
+      return res.json({ viewUrl: fileUrl, type: "pdf" });
     }
-    // For Office documents - redirect to Google Docs Viewer (opens in new tab)
-    else if (
-      mimeType === 'application/msword' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      mimeType === 'application/vnd.ms-excel' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      mimeType === 'application/vnd.ms-powerpoint' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-    ) {
-      const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
-      // Return the URL so frontend can open in new tab
-      res.json({ viewUrl: googleViewerUrl, redirect: true });
-    }
-    else {
-      // For other files, force download
-      const response = await axios({
-        method: 'GET',
-        url: fileUrl,
-        responseType: 'stream'
-      });
 
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.originalName)}"`);
-      response.data.pipe(res);
+    if (mimeType && mimeType.startsWith("image/")) {
+      return res.json({ viewUrl: fileUrl, type: "image" });
     }
+
+    const officeTypes = [
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ];
     
+    if (officeTypes.includes(mimeType)) {
+      const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(
+        fileUrl
+      )}&embedded=true`;
+      return res.json({ viewUrl: googleViewerUrl, type: "office" });
+    }
+
+    return res.json({ viewUrl: fileUrl, type: "other" });
   } catch (error) {
-    console.error("Failed to get document view:", error);
-    res.status(500).json({ error: "Unable to get document view." });
+    console.error("Failed to get document view URL:", error);
+    res.status(500).json({ error: "Unable to get document view URL." });
   }
 });
 
-// DOWNLOAD document
+// ─── GET /documents/:id/download  →  streams file to browser ─────────────────
 router.get("/documents/:id/download", async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -115,62 +85,183 @@ router.get("/documents/:id/download", async (req, res) => {
       return res.status(404).json({ error: "Document not found." });
     }
 
-    // Get file from Cloudinary
+    // Clean URL without flags ensures Axios can fetch the stream properly
     const fileUrl = cloudinary.url(document.publicId, {
       resource_type: document.resourceType || "auto",
       secure: true,
-      flags: "attachment",
     });
 
-    // Fetch file from Cloudinary
     const response = await axios({
-      method: 'GET',
+      method: "GET",
       url: fileUrl,
-      responseType: 'stream'
+      responseType: "stream",
     });
 
-    // Set proper headers for download
-    res.setHeader('Content-Type', document.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.originalName)}"`);
-    res.setHeader('Content-Length', document.sizeBytes);
+    res.setHeader("Content-Type", document.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(document.originalName)}"`
+    );
 
-    // Stream the file to response
+    if (document.sizeBytes) {
+      res.setHeader("Content-Length", document.sizeBytes);
+    }
+
     response.data.pipe(res);
-    
   } catch (error) {
     console.error("Download error:", error);
     res.status(500).json({ error: "Unable to download document." });
   }
 });
 
-// Alternative: Direct Cloudinary URL endpoint (opens in new tab)
-router.get("/documents/:id/open", async (req, res) => {
+// ─── GET /documents/:id/analyze  →  real AI analysis via Gemini ───────────────
+router.get("/documents/:id/analyze", async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
     if (!document) {
       return res.status(404).json({ error: "Document not found." });
     }
 
-    // Get direct Cloudinary URL
-    const fileUrl = cloudinary.url(document.publicId, {
-      resource_type: document.resourceType || "auto",
-      secure: true,
-    });
-
-    // For PDFs, return URL that can be opened directly
-    if (document.mimeType === 'application/pdf') {
-      return res.json({ url: fileUrl });
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Gemini API key is not configured." });
     }
-    
-    // For other files, return the Cloudinary URL
-    res.json({ url: fileUrl });
+
+    // Initialize standard Generative AI client
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const { mimeType, publicId, resourceType } = document;
+    let aiResponseText;
+
+    const supportedInlineMimeTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+
+    const prompt = `You are a professional legal AI assistant.
+Analyze this legal document thoroughly and respond ONLY with a valid JSON object (no markdown, no backticks) in exactly this format:
+{
+  "title": "short document title",
+  "summary": "2–3 sentence overview of what this document is about",
+  "keyPoints": ["point 1", "point 2", "point 3", "point 4", "point 5"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"]
+}`;
+
+    if (supportedInlineMimeTypes.includes(mimeType)) {
+      try {
+        const fileUrl = cloudinary.url(publicId, {
+          resource_type: resourceType || "auto",
+          secure: true,
+        });
+
+        const fileResponse = await axios({
+          method: "GET",
+          url: fileUrl,
+          responseType: "arraybuffer",
+        });
+
+        const base64Data = Buffer.from(fileResponse.data).toString("base64");
+
+        const response = await model.generateContent([
+          prompt,
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType,
+            },
+          },
+        ]);
+        aiResponseText = response.response.text();
+      } catch (fetchError) {
+        console.error("Could not fetch file for inline analysis:", fetchError.message);
+        aiResponseText = null; // Trigger fallback
+      }
+    }
+
+    // Fallback to metadata analysis if inline failed or type is unsupported (e.g. Word Docs)
+    if (!aiResponseText) {
+      const metaPrompt = `You are a professional legal AI assistant.
+Based on the following document metadata, provide a meaningful analysis.
+Respond ONLY with a valid JSON object (no markdown, no backticks) in exactly this format:
+{
+  "title": "short document title",
+  "summary": "2–3 sentence overview based on the metadata",
+  "keyPoints": ["point 1", "point 2", "point 3", "point 4"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"]
+}
+
+Document Metadata:
+- Title: ${document.title || document.originalName}
+- Type: ${document.documentType}
+- Case: ${document.caseName || "Not assigned"}
+- File name: ${document.originalName}
+- MIME type: ${mimeType}
+- Size: ${document.sizeReadable}
+- Uploaded: ${document.createdAt}`;
+
+      const response = await model.generateContent(metaPrompt);
+      aiResponseText = response.response.text();
+    }
+
+    let analysis;
+    try {
+      const cleaned = aiResponseText
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+      analysis = JSON.parse(cleaned);
+    } catch {
+      analysis = {
+        title: document.title || document.originalName,
+        summary: aiResponseText,
+        keyPoints: [],
+        recommendations: [],
+      };
+    }
+
+    res.json({ analysis });
   } catch (error) {
-    console.error("Failed to get document URL:", error);
-    res.status(500).json({ error: "Unable to get document URL." });
+    console.error("Failed to analyze document:", error);
+    res.status(500).json({ error: "Failed to analyze document.", details: error.message });
   }
 });
 
-// POST upload document
+// ─── DELETE /documents/:id  →  removes from Cloudinary + MongoDB ──────────────
+router.delete("/documents/:id", async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found." });
+    }
+
+    try {
+      // Must use exact resource type for successful deletion
+      await cloudinary.uploader.destroy(document.publicId, {
+        resource_type: document.resourceType, 
+        invalidate: true,
+      });
+    } catch (cloudErr) {
+      console.error("Cloudinary delete warning:", cloudErr.message);
+    }
+
+    await Document.findByIdAndDelete(req.params.id);
+
+    try {
+      const ChunkModel = require("../models/ChunkModel");
+      await ChunkModel.deleteMany({ documentId: req.params.id });
+    } catch {}
+
+    res.json({ message: "Document deleted successfully." });
+  } catch (error) {
+    console.error("Failed to delete document:", error);
+    res.status(500).json({ error: "Unable to delete document." });
+  }
+});
+
+// ─── POST /upload ─────────────────────────────────────────────────────────────
 router.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -180,18 +271,17 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const { caseName, documentType } = req.body;
     const file = req.file;
 
-    // Convert buffer to base64 for Cloudinary upload
     const base64File = file.buffer.toString("base64");
     const dataURI = `data:${file.mimetype};base64,${base64File}`;
 
-    // Upload to Cloudinary
     const uploadResult = await cloudinary.uploader.upload(dataURI, {
       folder: "legal_documents",
       resource_type: "auto",
       access_mode: "public",
+      use_filename: true,    // Added: Ensures the extension (.pdf, .docx) is kept for viewers
+      unique_filename: true, // Added: Prevents overwriting files with the same name
     });
 
-    // Format file size
     const formatBytes = (bytes) => {
       if (bytes === 0) return "0 Bytes";
       const k = 1024;
@@ -200,9 +290,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
     };
 
-    // Create document record
     const document = new Document({
-      title: file.originalname.split(".")[0],
+      title: file.originalname.replace(/\.[^/.]+$/, ""),
       originalName: file.originalname,
       description: "",
       caseName: caseName || "Unassigned",
@@ -227,60 +316,6 @@ router.post("/upload", upload.single("file"), async (req, res) => {
   } catch (error) {
     console.error("Failed to upload document:", error);
     res.status(500).json({ error: "Unable to upload document." });
-  }
-});
-
-// GET analyze document
-router.get("/documents/:id/analyze", async (req, res) => {
-  try {
-    const document = await Document.findById(req.params.id);
-    if (!document) {
-      return res.status(404).json({ error: "Document not found." });
-    }
-
-    const analysis = {
-      title: document.title || document.originalName,
-      summary: `This document is a ${document.documentType.toLowerCase()} related to "${document.caseName || "an unspecified case"}". File size: ${document.sizeReadable}`,
-      keyPoints: [
-        `Document Type: ${document.documentType}`,
-        `Case: ${document.caseName || "Not assigned"}`,
-        `File: ${document.originalName}`,
-        `Size: ${document.sizeReadable}`,
-      ],
-      recommendations: [
-        "Review document for legal compliance",
-        "Share with relevant team members",
-      ],
-    };
-
-    res.json({ analysis });
-  } catch (error) {
-    console.error("Failed to analyze document:", error);
-    res.status(500).json({ error: "Failed to analyze document." });
-  }
-});
-
-// DELETE document
-router.delete("/documents/:id", async (req, res) => {
-  try {
-    const document = await Document.findById(req.params.id);
-    if (!document) {
-      return res.status(404).json({ error: "Document not found." });
-    }
-
-    // Delete from Cloudinary
-    await cloudinary.uploader.destroy(document.publicId, {
-      resource_type: document.resourceType,
-      invalidate: true,
-    });
-
-    // Delete from database
-    await Document.findByIdAndDelete(req.params.id);
-
-    res.json({ message: "Document deleted successfully." });
-  } catch (error) {
-    console.error("Failed to delete document:", error);
-    res.status(500).json({ error: "Unable to delete document." });
   }
 });
 
