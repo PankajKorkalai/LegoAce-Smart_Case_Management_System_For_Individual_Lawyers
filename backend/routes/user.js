@@ -9,6 +9,7 @@ const sendemail=require("../otplogic/otp");
 const OtpModel=require("../models/OtpModel");
 const UserModel = require("../models/UserModel");
 const JWT_KEY=process.env.JWT_KEY;
+const caseModel=require("../models/CaseModel");
 
 Userrouter.post("/register", async function(req,res){
     console.log("register api called");
@@ -111,6 +112,77 @@ Userrouter.post("/login", async function (req, res) {
 
 });
 
+
+
+Userrouter.post("/addcase", async (req, res) => {
+  try {
+    const {
+      caseTitle,
+      client,
+      clientEmail,
+      priority,
+      status,
+      assignedTo,
+      caseDescription,
+      nextHearing,
+      documentsCount,
+    } = req.body;
+
+    if (!caseTitle || !client) {
+      return res.status(400).json({
+        message: "caseTitle and client are required",
+      });
+    }
+
+    // ✅ find user
+    const user = await UserModel.findOne({ email: clientEmail });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+   
+    user.cases.push({
+      caseTitle,
+      client,
+      clientEmail,
+      priority,
+      status,
+      assignedTo,
+      caseDescription,
+      nextHearing,
+      documentsCount,
+    });
+
+    await user.save();
+
+    const newcase=await caseModel.create({
+        caseTitle,
+        client,
+        clientEmail,
+        priority,
+        status,
+        assignedTo,
+        caseDescription,
+        nextHearing,
+        documentsCount,
+        createdBy:user._id
+    })
+
+    res.json({
+      message: "Case added successfully",
+      case: newcase,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+});
 
 
 module.exports=Userrouter;

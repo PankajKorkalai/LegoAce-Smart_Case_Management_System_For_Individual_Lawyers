@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, Plus, X, MoreVertical, Eye, Bell, Edit, RefreshCw, Mail, Phone, MessageSquare, Send } from "lucide-react";
-
+import { Search, Plus, X, MoreVertical, Eye, Bell, Edit, RefreshCw, Mail, Phone, Send, AlertTriangle, CheckCircle } from "lucide-react";
+import axios from "axios";
 const initialCases = [
   {
     id: "CASE-2024-001",
@@ -60,12 +60,17 @@ const attorneys = [
 ];
 
 export default function Cases() {
+  const [cases, setCases] = useState(initialCases);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRef = useRef(null);
-  
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [typeFilter, setTypeFilter] = useState("All Types");
+
   const [formData, setFormData] = useState({
     caseTitle: "",
     client: "",
@@ -75,26 +80,24 @@ export default function Cases() {
     caseDescription: "",
   });
   
-  const [alertData, setAlertData] = useState({
-    subject: "",
-    message: "",
-    platforms: {
-      email: true,
-      sms: false,
-      whatsapp: false,
-    },
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertSubject, setAlertSubject] = useState("");
+  const [sendVia, setSendVia] = useState({
+    email: true,
+    sms: false,
+    whatsapp: false,
   });
 
-  // Close dropdown when clicking outside
+  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      if (openMenuId !== null) {
         setOpenMenuId(null);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [openMenuId]);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -103,27 +106,37 @@ export default function Cases() {
     });
   };
 
-  const handleAlertInputChange = (e) => {
-    setAlertData({
-      ...alertData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handlePlatformToggle = (platform) => {
-    setAlertData({
-      ...alertData,
-      platforms: {
-        ...alertData.platforms,
-        [platform]: !alertData.platforms[platform],
-      },
-    });
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async(e) => {
+    console.log("already hain")
     e.preventDefault();
-    console.log("New case:", formData);
+    const newCase = {
+      id: `CASE-2024-${String(cases.length + 1).padStart(3, '0')}`,
+      title: formData.caseTitle,
+      status: formData.status,
+      priority: formData.priority,
+      client: formData.client,
+      clientEmail: "client@email.com",
+      clientPhone: "+1 (555) 000-0000",
+      type: "General",
+      docs: 0,
+      nextHearing: "TBD",
+      assigned: formData.assignedTo,
+    };
+    
+    setCases([newCase, ...cases]);
     setIsModalOpen(false);
+    
+    const resp=await axios.post(`${import.meta.env.VITE_API_URL}/user/addcase`,{
+      caseTitle: formData.caseTitle,
+      client: formData.client,
+      priority: formData.priority,
+      status: formData.status,
+      assignedTo: formData.assignedTo,
+      caseDescription: formData.caseDescription,
+      clientEmail: formData.clientEmail,
+    });
+    console.log("resp ",resp);
+
     setFormData({
       caseTitle: "",
       client: "",
@@ -134,52 +147,96 @@ export default function Cases() {
     });
   };
 
-  const handleSendAlert = (e) => {
-    e.preventDefault();
-    console.log("Sending alert for case:", selectedCase);
-    console.log("Alert data:", alertData);
-    alert(`Alert sent to ${selectedCase.client} via ${Object.keys(alertData.platforms).filter(p => alertData.platforms[p]).join(', ')}`);
-    setIsAlertModalOpen(false);
-    setAlertData({
-      subject: "",
-      message: "",
-      platforms: {
-        email: true,
-        sms: false,
-        whatsapp: false,
-      },
+  const handleToggleMenu = (caseId, event) => {
+    event.stopPropagation();
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    setMenuPosition({
+      top: rect.bottom + window.scrollY + 5,
+      right: window.innerWidth - rect.right + 10,
     });
-    setSelectedCase(null);
+    setOpenMenuId(openMenuId === caseId ? null : caseId);
   };
 
-  const openAlertModal = (caseItem) => {
-    console.log("Opening alert modal for:", caseItem.title);
+  const openAlertDialog = (caseItem) => {
     setSelectedCase(caseItem);
-    setAlertData({
-      subject: `Update regarding ${caseItem.title}`,
-      message: `Dear ${caseItem.client},\n\nThis is an update regarding your case ${caseItem.title} (${caseItem.id}).\n\nNext hearing: ${caseItem.nextHearing}\n\nPlease contact our office if you have any questions.\n\nBest regards,\nLegalFlow Team`,
-      platforms: {
-        email: true,
-        sms: false,
-        whatsapp: false,
-      },
-    });
-    setIsAlertModalOpen(true);
+    setAlertSubject(`Update regarding ${caseItem.title}`);
+    setAlertMessage(`Dear ${caseItem.client},
+
+This is an update regarding your case ${caseItem.title} (${caseItem.id}).
+
+Next hearing: ${caseItem.nextHearing}
+
+Please contact our office if you have any questions.
+
+Best regards,
+LegalFlow Team`);
+    setSendVia({ email: true, sms: false, whatsapp: false });
+    setShowAlertDialog(true);
     setOpenMenuId(null);
+  };
+
+  const handleSendAlert = (e) => {
+    e.preventDefault();
+    const selectedMethods = Object.keys(sendVia).filter(key => sendVia[key]);
+    
+    if (selectedMethods.length === 0) {
+      alert("Please select at least one method (Email, SMS, or WhatsApp)");
+      return;
+    }
+    
+    // Simulate sending alerts
+    console.log("=== SENDING ALERT ===");
+    console.log("To:", selectedCase.client);
+    console.log("Email:", selectedCase.clientEmail);
+    console.log("Phone:", selectedCase.clientPhone);
+    console.log("Subject:", alertSubject);
+    console.log("Message:", alertMessage);
+    console.log("Via:", selectedMethods);
+    
+    // Store sent alert in case object (for demo)
+    const updatedCases = cases.map(c => 
+      c.id === selectedCase.id 
+        ? { ...c, lastAlert: { message: alertSubject, date: new Date().toISOString(), methods: selectedMethods } }
+        : c
+    );
+    setCases(updatedCases);
+    
+    setShowAlertDialog(false);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+    setSelectedCase(null);
+    setAlertMessage("");
+    setAlertSubject("");
   };
 
   const handleViewDetails = (caseItem) => {
-    console.log("View details for:", caseItem);
+    console.log("View details:", caseItem);
     setOpenMenuId(null);
+    // You can implement a details modal here
+    alert(`Case Details:\n\nTitle: ${caseItem.title}\nClient: ${caseItem.client}\nStatus: ${caseItem.status}\nPriority: ${caseItem.priority}\nNext Hearing: ${caseItem.nextHearing}`);
   };
 
   const handleEditCase = (caseItem) => {
     console.log("Edit case:", caseItem);
     setOpenMenuId(null);
+    // Pre-fill form for editing
+    setFormData({
+      caseTitle: caseItem.title,
+      client: caseItem.client,
+      priority: caseItem.priority,
+      status: caseItem.status,
+      assignedTo: caseItem.assigned,
+      caseDescription: "",
+    });
+    setIsModalOpen(true);
   };
 
-  const handleChangeStatus = (caseItem) => {
-    console.log("Change status for:", caseItem);
+  const handleChangeStatus = (caseItem, newStatus) => {
+    const updatedCases = cases.map(c => 
+      c.id === caseItem.id ? { ...c, status: newStatus } : c
+    );
+    setCases(updatedCases);
     setOpenMenuId(null);
   };
 
@@ -195,8 +252,34 @@ export default function Cases() {
     return "bg-gray-100 text-gray-700";
   };
 
+  // Filter cases based on search and filters
+  const filteredCases = cases.filter(caseItem => {
+    const matchesSearch = caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         caseItem.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         caseItem.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === "All Status" || 
+                         caseItem.status.toLowerCase() === statusFilter.toLowerCase();
+    
+    const matchesType = typeFilter === "All Types" || 
+                       caseItem.type === typeFilter;
+    
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  // Get unique case types for filter
+  const caseTypes = ["All Types", ...new Set(cases.map(c => c.type))];
+
   return (
     <div className="bg-gray-100 min-h-screen p-6">
+      {/* Success Message Toast */}
+      {showSuccessMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slide-in">
+          <CheckCircle size={20} />
+          Alert sent successfully!
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -220,115 +303,165 @@ export default function Cases() {
             type="text"
             placeholder="Search cases, clients, documents..."
             className="w-full pl-10 pr-4 py-2 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600 border border-gray-200 text-sm"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <select className="px-4 py-2 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer">
+        <select 
+          className="px-4 py-2 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
           <option>All Status</option>
           <option>Active</option>
           <option>Pending</option>
           <option>Closed</option>
         </select>
 
-        <select className="px-4 py-2 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer">
-          <option>All Types</option>
-          <option>Civil Litigation</option>
-          <option>Real Estate</option>
-          <option>Employment Law</option>
-          <option>Family Law</option>
+        <select 
+          className="px-4 py-2 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          {caseTypes.map((type, idx) => (
+            <option key={idx}>{type}</option>
+          ))}
         </select>
       </div>
 
       {/* Case Cards */}
       <div className="space-y-4">
-        {initialCases.map((caseItem, i) => (
-          <div
-            key={i}
-            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 overflow-hidden"
-          >
-            <div className="p-5">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h2 className="font-semibold text-gray-900 text-lg">{caseItem.title}</h2>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(caseItem.status)}`}>
-                      {caseItem.status}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getPriorityColor(caseItem.priority)}`}>
-                      {caseItem.priority}
-                    </span>
+        {filteredCases.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center text-gray-500">
+            No cases found matching your criteria.
+          </div>
+        ) : (
+          filteredCases.map((caseItem) => (
+            <div
+              key={caseItem.id}
+              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 overflow-hidden"
+            >
+              <div className="p-5">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <h2 className="font-semibold text-gray-900 text-lg">{caseItem.title}</h2>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(caseItem.status)}`}>
+                        {caseItem.status}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getPriorityColor(caseItem.priority)}`}>
+                        {caseItem.priority}
+                      </span>
+                      {caseItem.lastAlert && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+                          Alert Sent
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mb-3">{caseItem.id}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500 text-xs">Client</p>
+                        <p className="text-gray-900 font-medium text-sm">{caseItem.client}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Case Type</p>
+                        <p className="text-gray-900 text-sm">{caseItem.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Documents</p>
+                        <p className="text-gray-900 text-sm">{caseItem.docs} docs</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Next Hearing</p>
+                        <p className="text-gray-900 text-sm">{caseItem.nextHearing}</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-500 mb-3">{caseItem.id}</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-500 text-xs">Client</p>
-                      <p className="text-gray-900 font-medium text-sm">{caseItem.client}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Case Type</p>
-                      <p className="text-gray-900 text-sm">{caseItem.type}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Documents</p>
-                      <p className="text-gray-900 text-sm">{caseItem.docs} docs</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Next Hearing</p>
-                      <p className="text-gray-900 text-sm">{caseItem.nextHearing}</p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Three Dots Button */}
-                <div className="relative" ref={menuRef}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuId(openMenuId === caseItem.id ? null : caseItem.id);
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition"
-                  >
-                    <MoreVertical size={18} className="text-gray-500" />
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {openMenuId === caseItem.id && (
-                    <div 
-                      className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[100] py-1"
-                      onClick={(e) => e.stopPropagation()}
+                  {/* Three Dots Button */}
+                  <div>
+                    <button
+                      onClick={(e) => handleToggleMenu(caseItem.id, e)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition"
                     >
-                      <button
-                        onClick={() => handleViewDetails(caseItem)}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                      >
-                        <Eye size={14} /> View Details
-                      </button>
-                      <button
-                        onClick={() => openAlertModal(caseItem)}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                      >
-                        <Bell size={14} /> Send Alerts
-                      </button>
-                      <button
-                        onClick={() => handleEditCase(caseItem)}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                      >
-                        <Edit size={14} /> Edit Case
-                      </button>
-                      <button
-                        onClick={() => handleChangeStatus(caseItem)}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                      >
-                        <RefreshCw size={14} /> Change Status
-                      </button>
-                    </div>
-                  )}
+                      <MoreVertical size={18} className="text-gray-500" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
+
+      {/* Global Dropdown Menu */}
+      {openMenuId && (
+        <div 
+          className="fixed z-50 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
+          style={{
+            top: `${menuPosition.top}px`,
+            right: `${menuPosition.right}px`,
+          }}
+        >
+          {(() => {
+            const caseItem = cases.find(c => c.id === openMenuId);
+            if (!caseItem) return null;
+            return (
+              <div className="py-1">
+                <button
+                  onClick={() => handleViewDetails(caseItem)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                >
+                  <Eye size={14} /> View Details
+                </button>
+                <button
+                  onClick={() => openAlertDialog(caseItem)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                >
+                  <Bell size={14} /> Send Alerts
+                </button>
+                <button
+                  onClick={() => handleEditCase(caseItem)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                >
+                  <Edit size={14} /> Edit Case
+                </button>
+                
+                {/* Change Status Submenu */}
+                <div className="relative group">
+                  <button
+                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                  >
+                    <RefreshCw size={14} /> Change Status
+                  </button>
+                  <div className="absolute left-full top-0 ml-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                    <button
+                      onClick={() => handleChangeStatus(caseItem, "active")}
+                      className="w-full px-4 py-2 text-left text-sm text-green-700 hover:bg-gray-50"
+                    >
+                      Active
+                    </button>
+                    <button
+                      onClick={() => handleChangeStatus(caseItem, "pending")}
+                      className="w-full px-4 py-2 text-left text-sm text-yellow-700 hover:bg-gray-50"
+                    >
+                      Pending
+                    </button>
+                    <button
+                      onClick={() => handleChangeStatus(caseItem, "closed")}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Closed
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Modal - Add New Case */}
       {isModalOpen && (
@@ -350,6 +483,10 @@ export default function Cases() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Case Title</label>
                 <input type="text" name="caseTitle" value={formData.caseTitle} onChange={handleInputChange} placeholder="Enter case title" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600" required />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Client Email</label>
+                <input type="email" name="clientEmail" value={formData.clientEmail} onChange={handleInputChange} placeholder="Enter client email" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600" required />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -402,154 +539,155 @@ export default function Cases() {
         </div>
       )}
 
-      {/* Modal - Send Alerts */}
-      {isAlertModalOpen && selectedCase && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
-          onClick={(e) => {
-            // Don't close when clicking inside the modal
-            if (e.target === e.currentTarget) {
-              // Optional: close when clicking backdrop
-              // setIsAlertModalOpen(false);
-            }
-          }}
-        >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
-              <div className="flex justify-between items-center">
+      {/* ALERT DIALOG BOX */}
+      {showAlertDialog && selectedCase && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
+          <div className="bg-white rounded-xl w-[550px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Send Alert to Client</h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Send notification to {selectedCase.client} regarding {selectedCase.title}
-                  </p>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <AlertTriangle size={20} className="text-yellow-500" />
+                    Send Alert to Client
+                  </h2>
                 </div>
                 <button 
-                  onClick={() => {
-                    setIsAlertModalOpen(false);
-                    setSelectedCase(null);
-                  }} 
-                  className="text-gray-400 hover:text-gray-600 transition p-1 rounded-full hover:bg-gray-100"
+                  onClick={() => setShowAlertDialog(false)}
+                  className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
                 >
-                  <X size={22} />
+                  <X size={24} />
                 </button>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                <p className="font-semibold text-gray-900">{selectedCase.title}</p>
+                <p className="text-sm text-gray-600 mt-1">Client: {selectedCase.client}</p>
+                <p className="text-sm text-gray-600">Case ID: {selectedCase.id}</p>
+                <p className="text-sm text-gray-600">Next Hearing: {selectedCase.nextHearing}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Subject *</label>
+                  <input
+                    type="text"
+                    value={alertSubject}
+                    onChange={(e) => setAlertSubject(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                    placeholder="Enter subject"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Message *</label>
+                  <textarea
+                    value={alertMessage}
+                    onChange={(e) => setAlertMessage(e.target.value)}
+                    rows={6}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent resize-none"
+                    placeholder="Enter your message"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Send via *</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                      <input
+                        type="checkbox"
+                        checked={sendVia.email}
+                        onChange={(e) => setSendVia({...sendVia, email: e.target.checked})}
+                        className="w-4 h-4 text-green-600"
+                      />
+                      <Mail size={18} className="text-gray-500" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">Email</span>
+                        <p className="text-xs text-gray-500">{selectedCase.clientEmail}</p>
+                      </div>
+                    </label>
+                    
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                      <input
+                        type="checkbox"
+                        checked={sendVia.sms}
+                        onChange={(e) => setSendVia({...sendVia, sms: e.target.checked})}
+                        className="w-4 h-4 text-green-600"
+                      />
+                      <Phone size={18} className="text-gray-500" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">SMS</span>
+                        <p className="text-xs text-gray-500">{selectedCase.clientPhone}</p>
+                      </div>
+                    </label>
+                    
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                      <input
+                        type="checkbox"
+                        checked={sendVia.whatsapp}
+                        onChange={(e) => setSendVia({...sendVia, whatsapp: e.target.checked})}
+                        className="w-4 h-4 text-green-600"
+                      />
+                      <Send size={18} className="text-gray-500" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">WhatsApp</span>
+                        <p className="text-xs text-gray-500">{selectedCase.clientPhone}</p>
+                      </div>
+                    </label>
+
+                          <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                      <input
+                        type="checkbox"
+                      
+                        className="w-4 h-4 text-green-600"
+                      />
+                      <Phone size={18} className="text-gray-500" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">Call</span>
+                        <p className="text-xs text-gray-500">{selectedCase.clientPhone}</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowAlertDialog(false)}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSendAlert}
+                    className="flex-1 px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium flex items-center justify-center gap-2"
+                  >
+                    <Send size={16} />
+                    Send Alert
+                  </button>
+                </div>
               </div>
             </div>
-
-            <form onSubmit={handleSendAlert} className="px-6 py-5 space-y-5">
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                <p className="text-sm font-medium text-blue-800 mb-1">Case Information</p>
-                <p className="text-sm text-blue-700">{selectedCase.title} ({selectedCase.id})</p>
-                <p className="text-sm text-blue-600 mt-1">Client: {selectedCase.client}</p>
-                <p className="text-sm text-blue-600">Next Hearing: {selectedCase.nextHearing}</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  name="subject" 
-                  value={alertData.subject} 
-                  onChange={handleAlertInputChange} 
-                  placeholder="Enter alert subject" 
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600" 
-                  required 
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
-                <textarea 
-                  name="message" 
-                  value={alertData.message} 
-                  onChange={handleAlertInputChange} 
-                  placeholder="Enter your message to the client..." 
-                  rows={6} 
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 resize-none" 
-                  required 
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Send via</label>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                    <input type="checkbox" checked={alertData.platforms.email} onChange={() => handlePlatformToggle("email")} className="w-4 h-4 text-green-600" />
-                    <Mail size={18} className="text-gray-500" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Email</p>
-                      <p className="text-xs text-gray-400">Send to {selectedCase.clientEmail}</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                    <input type="checkbox" checked={alertData.platforms.sms} onChange={() => handlePlatformToggle("sms")} className="w-4 h-4 text-green-600" />
-                    <Phone size={18} className="text-gray-500" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">SMS / Text Message</p>
-                      <p className="text-xs text-gray-400">Send to {selectedCase.clientPhone}</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                    <input type="checkbox" checked={alertData.platforms.whatsapp} onChange={() => handlePlatformToggle("whatsapp")} className="w-4 h-4 text-green-600" />
-                    <MessageSquare size={18} className="text-gray-500" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">WhatsApp</p>
-                      <p className="text-xs text-gray-400">Send to {selectedCase.clientPhone}</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Quick Templates</label>
-                <div className="flex flex-wrap gap-2">
-                  <button 
-                    type="button" 
-                    onClick={() => setAlertData({...alertData, message: `Dear ${selectedCase.client},\n\nThis is a reminder that your next hearing for ${selectedCase.title} is scheduled on ${selectedCase.nextHearing}.\n\nPlease ensure all required documents are submitted before the hearing date.\n\nBest regards,\nLegalFlow Team`})} 
-                    className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                  >
-                    Hearing Reminder
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setAlertData({...alertData, message: `Dear ${selectedCase.client},\n\nWe have received new documents related to your case ${selectedCase.title}. Please review them at your earliest convenience.\n\nBest regards,\nLegalFlow Team`})} 
-                    className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                  >
-                    Document Update
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setAlertData({...alertData, message: `Dear ${selectedCase.client},\n\nWe would like to schedule a follow-up consultation regarding ${selectedCase.title}. Please let us know your availability.\n\nThank you for your cooperation.\n\nBest regards,\nLegalFlow Team`})} 
-                    className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                  >
-                    Schedule Meeting
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setIsAlertModalOpen(false);
-                    setSelectedCase(null);
-                  }} 
-                  className="px-5 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 text-sm bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium flex items-center gap-2"
-                >
-                  <Send size={14} /> Send Alert
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
+
+      {/* Add custom animation CSS */}
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-in {
+          animation: slideIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
