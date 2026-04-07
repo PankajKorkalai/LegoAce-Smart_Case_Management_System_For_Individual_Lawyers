@@ -1,10 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X } from 'lucide-react'; // Removed 'Scale' since we are using the image now
+import { Menu, X, User, Settings, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Navbar2 = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  
+  const profileRef = useRef(null);
+  const navigate = useNavigate();
+
+  const token = localStorage.getItem("token");
+  const userName = localStorage.getItem("userName") || "";
+  const userInitials = userName ? userName.charAt(0).toUpperCase() : "";
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfile(false);
+      }
+    }
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   // Handle scroll effect for navbar shadow/blur
   useEffect(() => {
@@ -73,16 +93,64 @@ const Navbar2 = () => {
             </nav>
 
             {/* Desktop Actions */}
-            <div className="hidden md:flex items-center gap-6">
-              <a 
-                href="/login" 
-                className="text-gray-900 hover:text-[#047857] font-medium text-sm transition-colors"
-              >
-                Sign In
-              </a>
-              <button className="bg-[#047857] hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow">
-                Get Started
-              </button>
+            <div className="hidden md:flex items-center gap-6 relative">
+              {token ? (
+                <div 
+                  className="flex items-center gap-2 cursor-pointer"
+                  ref={profileRef}
+                  onClick={() => setShowProfile(!showProfile)}
+                >
+                  <div className="w-8 h-8 bg-green-700 text-white rounded-full flex items-center justify-center font-medium">
+                    {userInitials}
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-medium text-gray-900">{userName}</p>
+                  </div>
+                  
+                  {/* Profile Dropdown */}
+                  {showProfile && (
+                    <div className="absolute right-0 top-12 w-52 bg-white rounded-xl shadow-xl z-50 border border-gray-100">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="font-medium text-gray-900">{userName}</p>
+                        <p className="text-xs text-gray-500">Legal Professional</p>
+                      </div>
+                      <div className="p-2 text-sm space-y-1">
+                        <button onClick={() => navigate("/dashboard")} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-50 text-gray-700">
+                          <User size={16} />
+                          Go to Dashboard
+                        </button>
+                        <button onClick={() => navigate("/settings")} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-50 text-gray-700">
+                          <Settings size={16} />
+                          Settings
+                        </button>
+                        <button 
+                          onClick={() => {
+                            localStorage.removeItem("token");
+                            localStorage.removeItem("userName");
+                            window.location.reload();
+                          }} 
+                          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-50 text-red-600"
+                        >
+                          <LogOut size={16} />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <a 
+                    href="/login" 
+                    className="text-gray-900 hover:text-[#047857] font-medium text-sm transition-colors"
+                  >
+                    Sign In
+                  </a>
+                  <button onClick={() => navigate("/login")} className="bg-[#047857] hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow">
+                    Get Started
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Toggle Button */}
@@ -119,15 +187,35 @@ const Navbar2 = () => {
                 </a>
               ))}
               <div className="pt-4 mt-4 border-t border-gray-100 flex flex-col gap-3">
-                <a
-                  href="/login"
-                  className="block px-3 py-2 text-center rounded-lg text-base font-medium text-gray-900 hover:bg-gray-50 border border-gray-200"
-                >
-                  Sign In
-                </a>
-                <button className="w-full bg-[#047857] text-white px-3 py-3 rounded-lg font-semibold text-base">
-                  Get Started
-                </button>
+                {token ? (
+                  <>
+                    <button onClick={() => navigate("/dashboard")} className="block px-3 py-3 text-center rounded-lg text-base font-medium text-white bg-[#047857] hover:bg-emerald-800">
+                      Go to Dashboard
+                    </button>
+                    <button 
+                      onClick={() => {
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("userName");
+                        window.location.reload();
+                      }} 
+                      className="block px-3 py-2 text-center rounded-lg text-base font-medium text-red-600 bg-red-50 hover:bg-red-100"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <a
+                      href="/login"
+                      className="block px-3 py-2 text-center rounded-lg text-base font-medium text-gray-900 hover:bg-gray-50 border border-gray-200"
+                    >
+                      Sign In
+                    </a>
+                    <button onClick={() => navigate("/login")} className="w-full bg-[#047857] hover:bg-emerald-800 text-white px-3 py-3 rounded-lg font-semibold text-base transition-colors">
+                      Get Started
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

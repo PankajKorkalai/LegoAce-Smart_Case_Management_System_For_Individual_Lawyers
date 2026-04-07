@@ -25,7 +25,9 @@ const Login = () => {
         alert("Invalid email or password. Please try again.");
         return;
       } else{
-        navigate("/");
+        localStorage.setItem("token", resp.data.token);
+        localStorage.setItem("userName", resp.data.name || mail.split('@')[0]);
+        navigate("/dashboard");
       }
      } else{
       console.log("name ",name);
@@ -47,7 +49,8 @@ const Login = () => {
       } 
 
       else{
-      navigate("/");
+        alert("Registration successful! Please log in.");
+        setIsLogin(true); // switch back to login mode so they can use credentials
       }
 
       console.log("resp ",resp);
