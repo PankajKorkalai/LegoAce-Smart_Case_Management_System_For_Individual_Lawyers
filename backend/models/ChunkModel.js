@@ -1,14 +1,33 @@
 const mongoose = require("mongoose");
-const schema = mongoose.Schema;
 
-const chunkSchema = new schema({
-  documentId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Document' 
+const ChunkSchema = new mongoose.Schema(
+  {
+    documentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Document",
+      required: true,
+    },
+    caseName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    text: {
+      type: String,
+      required: true,
+    },
+    embedding: {
+      type: [Number], // Gemini embedding dimensions (768)
+      required: true,
+    },
   },
-  caseName: String,
-  text: String, // The actual chunk of text extracted from the PDF
-  embedding: [Number] // The math vector (e.g., 768 dimensions for Gemini)
-}, { timestamps: true });
+  {
+    timestamps: true,
+  }
+);
 
-module.exports = mongoose.model("Chunk", chunkSchema);
+// Optional: Add a vector index if using Atlas Search, or just a standard index for queries
+ChunkSchema.index({ documentId: 1 });
+ChunkSchema.index({ caseName: 1 });
+
+module.exports = mongoose.model("Chunk", ChunkSchema);
