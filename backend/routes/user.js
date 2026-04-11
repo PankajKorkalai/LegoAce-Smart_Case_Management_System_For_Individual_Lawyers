@@ -1,67 +1,64 @@
-const express=require("express");
-const Userrouter=express.Router();
+const express = require("express");
+const Userrouter = express.Router();
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const z =require('zod');
-const bcrypt=require("bcrypt");
-const jwt=require("jsonwebtoken");
-const otpgenerator=require("otp-generator");
-const sendemail=require("../otplogic/otp");
-const OtpModel=require("../models/OtpModel");
+const z = require('zod');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const otpgenerator = require("otp-generator");
+const sendemail = require("../otplogic/otp");
+const OtpModel = require("../models/OtpModel");
 const UserModel = require("../models/UserModel");
-const JWT_KEY=process.env.JWT_KEY;
-const caseModel=require("../models/CaseModel");
+const JWT_KEY = process.env.JWT_KEY;
+const caseModel = require("../models/CaseModel");
+const clientModel = require("../models/Clients.model");
 
-Userrouter.post("/register", async function(req,res){
-    console.log("register api called");
-    console.log("body ",req.body);
+Userrouter.post("/register", async function (req, res) {
+  console.log("register api called");
+  console.log("body ", req.body);
 
-   const requiredatas=z.object({
-      name:z.string().min(3).max(100),
-      email:z.string().min(5).max(100).email(),
-      password:z.string().min(5).max(100),
-   })
+  const requiredatas = z.object({
+    name: z.string().min(3).max(100),
+    email: z.string().min(5).max(100).email(),
+    password: z.string().min(5).max(100),
+  })
 
+  let registerUser = null;
+  const checkdata = requiredatas.safeParse(req.body);
 
+  if (!checkdata.success) {
+    res.json({ message: "Invalid_types" });
+    return;
+  }
 
-   let registerUser=null;
-   const checkdata=requiredatas.safeParse(req.body);
+  const {
+    name,
+    email,
+    password,
+  } = req.body;
 
-   if(!checkdata.success){
-      res.json({ message: "Invalid_types" });
-      return;
-   }
+  const hashedpassword = await bcrypt.hash(password, 5);
+  const checkAlreadyEmailExistOrNot = await UserModel.findOne({ email: email });
 
-   const {
-      name,
-      email,
-      password,
-   } = req.body;
-   //   console.log(req);
-   const hashedpassword=await bcrypt.hash(password,5);
-      // console.log("check errors ",checkAlreadyEmailExistOrNot);
-         const checkAlreadyEmailExistOrNot=await UserModel.findOne({email:email});
+  if (checkAlreadyEmailExistOrNot) {
+    res.json({
+      message: "Email_Present"
+    })
+    return;
+  }
 
-      if(checkAlreadyEmailExistOrNot){
-         res.json({
-            message:"Email_Present"
-         })
-         return;
-      }
+  registerUser = await UserModel.create({
+    name: name,
+    password: hashedpassword,
+    email: email,
+    lastLoginDate: null
+  });
 
-      registerUser=await UserModel.create({
-         name:name,
-         password:hashedpassword,
-         email:email,
-         lastLoginDate: null
-      });
-
-     // console.log("check errors ",checkAlreadyEmailExistOrNot);
-    
-      res.json({
-        registerUser
-      })
+  res.json({
+    registerUser
+  })
 })
-
 
 Userrouter.post("/login", async function (req, res) {
   const requiredatas = z.object({
@@ -72,7 +69,6 @@ Userrouter.post("/login", async function (req, res) {
   console.log("login api called");
   console.log("body ", req.body);
 
-
   const checkdata = requiredatas.safeParse(req.body);
   if (!checkdata.success) {
     return res.json({ message: checkdata.error });
@@ -80,46 +76,84 @@ Userrouter.post("/login", async function (req, res) {
 
   const { email, password } = req.body;
 
-  // ---------------- PATIENT LOGIN ----------------
+  const checkedUser = await UserModel.findOne({ email });
 
-    const checkedUser = await UserModel.findOne({ email });
+  if (!checkedUser) {
+    return res.json({ message: "User_not_exists" });
+  }
 
-    if (!checkedUser) {
-      return res.json({ message: "User_not_exists" });
+  const finduser = await bcrypt.compare(password, checkedUser.password);
+
+  if (!finduser) {
+    return res.json({ message: "User_not_exists" });
+  }
+
+  const lastLoginDate = checkedUser.lastLoginDate;
+
+  await UserModel.findOneAndUpdate(
+    { _id: checkedUser._id },
+    { $set: { lastLoginDate: new Date() } }
+  );
+
+  const token = jwt.sign({ id: checkedUser._id }, JWT_KEY);
+
+  return res.json({
+    token,
+    message: "logedin",
+    userId: checkedUser._id,
+    name: checkedUser.name,
+  });
+});
+
+Userrouter.post("/google-login", async (req, res) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    return res.status(400).json({ message: "No Google token provided" });
+  }
+
+  try {
+    console.log("Google login verification starting...");
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name } = payload;
+
+    console.log("Verified Google User:", email);
+
+    let user = await UserModel.findOne({ email });
+
+    if (!user) {
+      console.log("New user detected, creating record...");
+      user = await UserModel.create({
+        email,
+        name,
+        verified: true,
+        lastLoginDate: new Date()
+      });
+    } else {
+      console.log("Existing user detected, updating last login...");
+      user.lastLoginDate = new Date();
+      await user.save();
     }
 
-    console.log("checked user ", checkedUser);
-
-    const finduser = await bcrypt.compare(password, checkedUser.password);
-
-    if (!finduser) {
-      return res.json({ message: "User_not_exists" });
-    }
-
-    // GET LAST LOGIN DATE BEFORE UPDATING
-    const lastLoginDate = checkedUser.lastLoginDate;
-    // console.log(lastLoginDate)
-
-    // UPDATE LAST LOGIN DATE
-    await UserModel.findOneAndUpdate(
-      { _id: checkedUser._id },
-      { $set: { lastLoginDate: new Date() } }
-    );
-
-    // console.log(lastLoginDate)
-
-    const token = jwt.sign({ id: checkedUser._id }, JWT_KEY);
+    const token = jwt.sign({ id: user._id }, JWT_KEY);
 
     return res.json({
       token,
       message: "logedin",
-      userId: checkedUser._id,
-      name: checkedUser.name,
+      userId: user._id,
+      name: user.name,
     });
 
+  } catch (error) {
+    console.error("Google login failed:", error);
+    return res.status(400).json({ message: "Invalid Google token" });
+  }
 });
-
-
 
 Userrouter.post("/addcase", async (req, res) => {
   try {
@@ -133,6 +167,7 @@ Userrouter.post("/addcase", async (req, res) => {
       caseDescription,
       nextHearing,
       documentsCount,
+      userId,
     } = req.body;
 
     if (!caseTitle || !client) {
@@ -141,27 +176,25 @@ Userrouter.post("/addcase", async (req, res) => {
       });
     }
 
-    // ✅ find user
-    const user = await UserModel.findOne({ email: clientEmail });
+    const user = await UserModel.findById(userId);
 
     if (!user) {
       return res.status(404).json({
-        message: "User not found",
+        message: "Lawyer user not found",
       });
     }
 
-   
-    const newcase=await caseModel.create({
-        caseTitle,
-        client,
-        clientEmail,
-        priority,
-        status,
-        assignedTo,
-        caseDescription,
-        nextHearing,
-        documentsCount,
-        createdBy:user._id
+    const newcase = await caseModel.create({
+      caseTitle,
+      client,
+      clientEmail,
+      priority,
+      status,
+      assignedTo,
+      caseDescription,
+      nextHearing,
+      documentsCount,
+      createdBy: user._id
     });
 
     user.cases.push(newcase._id);
@@ -190,6 +223,16 @@ Userrouter.get("/getcases", async (req, res) => {
   }
 });
 
+Userrouter.get("/getclients", async (req, res) => {
+  try {
+    const clients = await clientModel.find({}).sort({ name: 1 });
+    res.json({ clients });
+  } catch (err) {
+    console.error("Error fetching clients:", err);
+    res.status(500).json({ message: "Failed to fetch clients" });
+  }
+});
+
 const sendFeedbackEmail = require("../utils/sendFeedbackEmail");
 
 Userrouter.put("/updatestatus/:id", async (req, res) => {
@@ -211,11 +254,9 @@ Userrouter.put("/updatestatus/:id", async (req, res) => {
       return res.status(404).json({ message: "Case not found" });
     }
 
-    // If status changed to closed, send feedback email
     if (status.toLowerCase() === "closed") {
       const clientEmail = updatedCase.clientEmail;
       if (clientEmail) {
-        // Send email in background
         sendFeedbackEmail(clientEmail, updatedCase.caseTitle, updatedCase._id, updatedCase.assignedTo)
           .catch(err => console.error("Failed to send feedback email in background:", err));
       }
@@ -233,13 +274,13 @@ const sendAlertEmail = require("../utils/sendAlertEmail");
 Userrouter.post("/sendalert", async (req, res) => {
   try {
     const { email, subject, message } = req.body;
-    
+
     if (!email || !subject || !message) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     await sendAlertEmail(email, subject, message);
-    
+
     res.json({ message: "Alert sent successfully" });
   } catch (err) {
     console.error("Error sending alert:", err);
@@ -251,7 +292,7 @@ Userrouter.put("/updatecase/:id", async (req, res) => {
   try {
     const caseId = req.params.id;
     const updateData = req.body;
-    
+
     const updatedCase = await caseModel.findByIdAndUpdate(
       caseId,
       updateData,
@@ -262,7 +303,6 @@ Userrouter.put("/updatecase/:id", async (req, res) => {
       return res.status(404).json({ message: "Case not found" });
     }
 
-    // Intercept "closed" status and send feedback email
     if (updateData.status && updateData.status.toLowerCase() === "closed") {
       const clientEmail = updatedCase.clientEmail;
       if (clientEmail) {
@@ -278,4 +318,22 @@ Userrouter.put("/updatecase/:id", async (req, res) => {
   }
 });
 
-module.exports=Userrouter;
+Userrouter.delete("/deletecase/:id", async (req, res) => {
+  try {
+    const caseId = req.params.id;
+    const caseToDelete = await caseModel.findById(caseId);
+    if (!caseToDelete) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+    if (caseToDelete.createdBy) {
+      await UserModel.findByIdAndUpdate(caseToDelete.createdBy, { $pull: { cases: caseId } });
+    }
+    await caseModel.findByIdAndDelete(caseId);
+    res.json({ message: "Case deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting case:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+module.exports = Userrouter;

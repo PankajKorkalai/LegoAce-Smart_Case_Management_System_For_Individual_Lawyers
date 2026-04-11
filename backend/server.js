@@ -13,6 +13,7 @@ const clientRouter = require("./routes/client");
 const profileRouter = require("./routes/profile");
 const scheduleRouter = require("./routes/schedule"); 
 const calendarRouter = require("./routes/calendar");
+const dashboardRouter = require("./routes/dashboard");
 
 connectDB();
 
@@ -31,10 +32,11 @@ app.use("/api", uploadRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api", documentsRouter);
 app.use("/user", userRouter);
+app.use("/user", profileRouter);
 app.use("/api", clientRouter);
-app.use("/api", profileRouter);
 app.use("/api/meetings", scheduleRouter); 
 app.use("/api", calendarRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 const PORT = process.env.PORT || 5000;
 

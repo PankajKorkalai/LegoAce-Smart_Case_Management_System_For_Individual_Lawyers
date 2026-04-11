@@ -17,6 +17,7 @@ import {
   Users,
   BookOpen,
 } from "lucide-react";
+import { FiLinkedin as Linkedin, FiTwitter as Twitter } from "react-icons/fi";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -53,6 +54,11 @@ export default function Profile() {
     role: "user",
     joinDate: "",
     lastLoginDate: null,
+  });
+  const [stats, setStats] = useState({
+    totalCases: 0,
+    totalDocuments: 0,
+    totalClients: 0,
   });
 
   const [formData, setFormData] = useState({
@@ -128,8 +134,28 @@ export default function Profile() {
     }
   };
 
+  // Fetch activity stats
+  const fetchStats = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${apiUrl}/user/profile/activity-stats`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setStats(data);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
+    fetchStats();
   }, []);
 
   // Update personal info
@@ -160,6 +186,10 @@ export default function Profile() {
 
       setMessage("Personal information updated successfully");
       setEditMode({ ...editMode, personal: false });
+      
+      // Notify Navbar to update (image/name)
+      window.dispatchEvent(new Event("profileUpdated"));
+      
       fetchProfile(); // Refresh profile data
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
@@ -192,6 +222,10 @@ export default function Profile() {
 
       setMessage("Bio updated successfully");
       setEditMode({ ...editMode, bio: false });
+      
+      // Notify Navbar to update
+      window.dispatchEvent(new Event("profileUpdated"));
+
       fetchProfile();
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
@@ -237,6 +271,10 @@ export default function Profile() {
 
       setMessage("Professional information updated successfully");
       setEditMode({ ...editMode, professional: false });
+      
+      // Notify Navbar to update
+      window.dispatchEvent(new Event("profileUpdated"));
+
       fetchProfile();
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
@@ -285,6 +323,10 @@ export default function Profile() {
       }
 
       setMessage("Profile picture updated successfully");
+      
+      // Notify Navbar to update
+      window.dispatchEvent(new Event("profileUpdated"));
+
       fetchProfile();
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
@@ -856,28 +898,27 @@ export default function Profile() {
                         <span className="text-gray-900 font-medium capitalize">{profile.role}</span>
                       </p>
                     </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  </div>                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-3">
                       <Award size={20} className="text-green-600" />
                       <h3 className="font-medium text-gray-900">Professional Stats</h3>
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="flex justify-between">
-                        <span className="text-gray-500">Years of Experience:</span>
-                        <span className="text-gray-900 font-medium">{profile.yearsOfExperience || 0}</span>
+                        <span className="text-gray-500">Total Cases:</span>
+                        <span className="text-gray-900 font-medium">{stats.totalCases}</span>
                       </p>
                       <p className="flex justify-between">
-                        <span className="text-gray-500">Practice Areas:</span>
-                        <span className="text-gray-900 font-medium">{profile.practiceAreas?.length || 0}</span>
+                        <span className="text-gray-500">Unique Clients:</span>
+                        <span className="text-gray-900 font-medium">{stats.totalClients}</span>
                       </p>
                       <p className="flex justify-between">
-                        <span className="text-gray-500">Languages:</span>
-                        <span className="text-gray-900 font-medium">{profile.languages?.length || 0}</span>
+                        <span className="text-gray-500">Documents Managed:</span>
+                        <span className="text-gray-900 font-medium">{stats.totalDocuments}</span>
                       </p>
                     </div>
                   </div>
+v>
                 </div>
               </div>
             </div>

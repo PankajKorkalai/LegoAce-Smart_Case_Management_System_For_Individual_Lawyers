@@ -11,9 +11,14 @@ const Navbar2 = () => {
   const profileRef = useRef(null);
   const navigate = useNavigate();
 
+  const [profilePic, setProfilePic] = useState(null);
+  const [userFullName, setUserFullName] = useState("");
+  
   const token = localStorage.getItem("token");
-  const userName = localStorage.getItem("userName") || "";
-  const userInitials = userName ? userName.charAt(0).toUpperCase() : "";
+  const userName = localStorage.getItem("name") || "User";
+  const userInitials = (userFullName || userName).charAt(0).toUpperCase();
+
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -23,8 +28,42 @@ const Navbar2 = () => {
       }
     }
     document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
+
+    // Fetch profile pic and real name
+    const fetchProfile = async () => {
+      try {
+        if (!token) return;
+
+        const response = await fetch(`${apiUrl}/user/profile`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          if (data.profilePicture?.url) {
+            setProfilePic(data.profilePicture.url);
+          }
+          if (data.firstName && data.lastName) {
+            setUserFullName(`${data.firstName} ${data.lastName}`);
+          } else if (data.name) {
+            setUserFullName(data.name);
+          }
+        }
+      } catch (err) {
+        console.error("Home Navbar profile fetch failed:", err);
+      }
+    };
+
+    fetchProfile();
+
+    // Listen for profile updates
+    const handleProfileUpdate = () => fetchProfile();
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+    };
+  }, [token]);
 
   // Handle scroll effect for navbar shadow/blur
   useEffect(() => {
@@ -100,19 +139,36 @@ const Navbar2 = () => {
                   ref={profileRef}
                   onClick={() => setShowProfile(!showProfile)}
                 >
-                  <div className="w-8 h-8 bg-green-700 text-white rounded-full flex items-center justify-center font-medium">
-                    {userInitials}
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-200">
+                    {profilePic ? (
+                      <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-green-700 text-white flex items-center justify-center font-medium">
+                        {userInitials}
+                      </div>
+                    )}
                   </div>
                   <div className="text-sm">
-                    <p className="font-medium text-gray-900">{userName}</p>
+                    <p className="font-medium text-gray-900">{userFullName || userName}</p>
                   </div>
                   
                   {/* Profile Dropdown */}
                   {showProfile && (
                     <div className="absolute right-0 top-12 w-52 bg-white rounded-xl shadow-xl z-50 border border-gray-100">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-medium text-gray-900">{userName}</p>
-                        <p className="text-xs text-gray-500">Legal Professional</p>
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-gray-100">
+                          {profilePic ? (
+                            <img src={profilePic} className="w-full h-full object-cover" alt="" />
+                          ) : (
+                            <div className="w-full h-full bg-green-700 text-white flex items-center justify-center text-xs font-bold">
+                              {userInitials}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 text-xs leading-tight">{userFullName || userName}</p>
+                          <p className="text-[10px] text-gray-500">Legal Professional</p>
+                        </div>
                       </div>
                       <div className="p-2 text-sm space-y-1">
                         <button onClick={() => navigate("/dashboard")} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-gray-50 text-gray-700">

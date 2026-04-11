@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const nodemailer = require("nodemailer");
 
-const User = require("../models/UserModel"); 
+const User = require("../models/UserModel");
 const Meeting = require("../models/MeetingModel"); // 1. IMPORT NEW MODEL
 
 // Fetch all users for the dropdown

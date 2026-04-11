@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Eye, Mail, Lock } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
   const [mail, setMail] = useState("");
@@ -27,6 +28,7 @@ const Login = () => {
         return;
       } else{
         localStorage.setItem("token", resp.data.token);
+        localStorage.setItem("userId", resp.data.userId); // STORE USER ID
         localStorage.setItem("userName", resp.data.name || mail.split('@')[0]);
         navigate("/dashboard");
       }
@@ -58,6 +60,28 @@ const Login = () => {
      }
 
   }
+
+  const handleGoogleSuccess = async (response) => {
+    try {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/user/google-login`, {
+        credential: response.credential
+      });
+      
+      if (res.data.token) {
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("userId", res.data.userId); // STORE USER ID
+        localStorage.setItem("userName", res.data.name);
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error("Google Login Error:", error);
+      alert("Google Sign-In failed. Please try again.");
+    }
+  };
+
+  const handleGoogleError = () => {
+    console.log("Google Sign-In was unsuccessful. Try again later.");
+  };
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
@@ -211,14 +235,17 @@ const Login = () => {
           </div>
 
           {/* Google */}
-          <button className="w-full border rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-gray-50">
-            <img
-              src="https://cdn-icons-png.flaticon.com/512/281/281764.png"
-              alt="google"
-              className="w-5"
+          <div className="flex justify-center w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap
+              theme="outline"
+              size="large"
+              shape="pill"
+              width="420"
             />
-            Continue with Google
-          </button>
+          </div>
 
           {/* Toggle */}
           <p className="text-center text-sm mt-5 text-gray-600">

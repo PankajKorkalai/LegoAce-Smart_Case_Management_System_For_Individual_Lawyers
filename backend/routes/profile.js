@@ -2,6 +2,9 @@ const express = require("express");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const UserModel = require("../models/UserModel");
+const CaseModel = require("../models/CaseModel");
+const DocumentModel = require("../models/Documents.model");
+const ClientModel = require("../models/Clients.model");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -36,7 +39,7 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_KEY);
+    const decoded = jwt.verify(token, process.env.JWT_KEY || "secret");
     req.userId = decoded.id;
     next();
   } catch (error) {
@@ -62,8 +65,8 @@ router.get("/profile", verifyToken, async (req, res) => {
       name: user.name,
       firstName: user.firstName || "",
       lastName: user.lastName || "",
-      phone: user.phone || user.MobileNo || "",
-      address: user.address || user.Address || "",
+      phone: user.phone || "",
+      address: user.address || "",
       bio: user.bio || "",
       title: user.title || "",
       specialization: user.specialization || "",
@@ -74,10 +77,9 @@ router.get("/profile", verifyToken, async (req, res) => {
       languages: user.languages || [],
       profilePicture: user.profilePicture || { url: "", publicId: "" },
       socialLinks: user.socialLinks || { linkedin: "", twitter: "", website: "" },
-      role: user.role,
-      joinDate: user.joinDate,
+      role: user.role || "user",
+      joinDate: user.joinDate || user.createdAt || new Date(),
       lastLoginDate: user.lastLoginDate,
-      isActive: user.isActive,
     };
 
     res.json(profileData);
@@ -254,17 +256,28 @@ router.delete("/profile/picture", verifyToken, async (req, res) => {
 router.get("/profile/activity-stats", verifyToken, async (req, res) => {
   try {
     const user = await UserModel.findById(req.userId);
-    
-    // You can add more statistics here based on your app's needs
-    // For example: cases handled, documents uploaded, etc.
-    
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Fetch user's cases
+    const userCases = await CaseModel.find({ createdBy: req.userId });
+    const userCaseIds = userCases.map(c => c._id);
+    const userCaseTitles = userCases.map(c => c.caseTitle);
+
+    // Count documents associated with these cases
+    const documentCount = await DocumentModel.countDocuments({ 
+      caseName: { $in: userCaseTitles } 
+    });
+
+    // Count unique clients in these cases
+    const uniqueClients = [...new Set(userCases.map(c => c.client))].length;
+
     const stats = {
       joinDate: user.joinDate,
       lastLoginDate: user.lastLoginDate,
       yearsOfExperience: user.yearsOfExperience || 0,
-      totalCases: 0, // This would come from Cases model
-      totalDocuments: 0, // This would come from Documents model
-      totalClients: 0, // This would come from Clients model
+      totalCases: userCases.length,
+      totalDocuments: documentCount,
+      totalClients: uniqueClients,
     };
 
     res.json(stats);

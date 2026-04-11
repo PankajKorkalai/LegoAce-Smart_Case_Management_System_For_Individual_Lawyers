@@ -14,17 +14,21 @@ import {
   import { useState, useRef, useEffect } from "react";
   import { useNavigate } from "react-router-dom";
   
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  
   export default function Navbar({ onMenuClick }) {
     const [showNotif, setShowNotif] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
+    const [profilePic, setProfilePic] = useState(null);
+    const [userFullName, setUserFullName] = useState("");
   
     const navigate = useNavigate();
   
     const notifRef = useRef(null);
     const profileRef = useRef(null);
   
-    const userName = localStorage.getItem("userName") || "Sarah Mitchell";
-    const userInitials = userName.charAt(0).toUpperCase();
+    const userName = localStorage.getItem("name") || "User";
+    const userInitials = (userFullName || userName).charAt(0).toUpperCase();
 
     // 🔥 OUTSIDE CLICK HANDLER
     useEffect(() => {
@@ -46,8 +50,40 @@ import {
   
       document.addEventListener("click", handleClickOutside);
   
+      // Fetch profile pic and real name
+      const fetchProfile = async () => {
+        try {
+          const token = localStorage.getItem("token");
+          if (!token) return;
+
+          const response = await fetch(`${apiUrl}/user/profile`, {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          const data = await response.json();
+          if (response.ok) {
+            if (data.profilePicture?.url) {
+              setProfilePic(data.profilePicture.url);
+            }
+            if (data.firstName && data.lastName) {
+              setUserFullName(`${data.firstName} ${data.lastName}`);
+            } else if (data.name) {
+              setUserFullName(data.name);
+            }
+          }
+        } catch (err) {
+          console.error("Navbar profile fetch failed:", err);
+        }
+      };
+
+      fetchProfile();
+
+      // Listen for profile updates (custom event)
+      const handleProfileUpdate = () => fetchProfile();
+      window.addEventListener("profileUpdated", handleProfileUpdate);
+  
       return () => {
         document.removeEventListener("click", handleClickOutside);
+        window.removeEventListener("profileUpdated", handleProfileUpdate);
       };
     }, []);
   
@@ -183,13 +219,23 @@ import {
               setShowNotif(false);
             }}
           >
-            <div className="w-8 h-8 bg-green-700 text-white rounded-full flex items-center justify-center font-medium">
-              {userInitials}
+            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-200">
+              {profilePic ? (
+                <img 
+                  src={profilePic} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-green-700 text-white flex items-center justify-center font-medium">
+                  {userInitials}
+                </div>
+              )}
             </div>
   
             <div className="text-sm hidden sm:block">
-              <p className="font-medium">{userName}</p>
-              <p className="text-gray-500 text-xs">Legal Professional</p>
+              <p className="font-medium">{userFullName || userName}</p>
+              <p className="text-gray-500 text-xs text-left">Legal Professional</p>
             </div>
           </div>
   
@@ -197,9 +243,20 @@ import {
           {showProfile && (
             <div className="absolute right-0 top-10 w-52 bg-white rounded-xl shadow-xl z-50">
               
-              <div className="px-4 py-3 border-b">
-                <p className="font-medium">{userName}</p>
-                <p className="text-xs text-gray-500">Legal Professional</p>
+              <div className="px-4 py-3 border-b flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-gray-100">
+                  {profilePic ? (
+                    <img src={profilePic} className="w-full h-full object-cover" alt="" />
+                  ) : (
+                    <div className="w-full h-full bg-green-700 text-white flex items-center justify-center text-xs font-bold">
+                      {userInitials}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-sm leading-tight">{userFullName || userName}</p>
+                  <p className="text-[11px] text-gray-500">Legal Professional</p>
+                </div>
               </div>
   
               <div className="p-2 text-sm space-y-1">

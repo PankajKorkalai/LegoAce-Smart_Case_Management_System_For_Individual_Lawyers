@@ -1,66 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, Plus, X, MoreVertical, Eye, Bell, Edit, RefreshCw, Mail, Phone, Send, AlertTriangle, CheckCircle } from "lucide-react";
 import axios from "axios";
-const initialCases = [
-  {
-    id: "CASE-2024-001",
-    title: "Smith vs. Johnson Corp",
-    status: "active",
-    priority: "high",
-    client: "John Smith",
-    clientEmail: "john.smith@email.com",
-    clientPhone: "+1 (555) 123-4567",
-    type: "Civil Litigation",
-    docs: 45,
-    nextHearing: "Feb 15, 2026",
-    assigned: "Sarah Mitchell",
-  },
-  {
-    id: "CASE-2024-002",
-    title: "Davis Property Dispute",
-    status: "pending",
-    priority: "medium",
-    client: "Robert Davis",
-    clientEmail: "robert.davis@email.com",
-    clientPhone: "+1 (555) 456-7890",
-    type: "Real Estate",
-    docs: 23,
-    nextHearing: "Feb 20, 2026",
-    assigned: "Michael Chen",
-  },
-  {
-    id: "CASE-2024-003",
-    title: "Rodriguez Employment Claim",
-    status: "active",
-    priority: "high",
-    client: "Maria Rodriguez",
-    clientEmail: "maria.rodriguez@email.com",
-    clientPhone: "+1 (555) 234-5678",
-    type: "Employment Law",
-    docs: 67,
-    nextHearing: "Feb 25, 2026",
-    assigned: "Sarah Mitchell",
-  },
-];
-
-const clientsList = [
-  "John Smith",
-  "Maria Rodriguez",
-  "Robert Davis",
-  "James Wilson",
-  "Tech Corp Inc",
-  "Green Energy LLC",
-];
-
 const attorneys = [
-  "Sarah Mitchell",
-  "Michael Chen",
-  "David Williams",
-  "Lisa Anderson",
+  "Adv. Pankaj Korkalai",
+  "Adv. Sarah Mitchell",
+  "Adv. Michael Chen",
+  "Adv. David Williams",
+  "Adv. Lisa Anderson",
 ];
 
 export default function Cases() {
-  const [cases, setCases] = useState(initialCases);
+  const [cases, setCases] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCaseId, setEditingCaseId] = useState(null);
   const [showAlertDialog, setShowAlertDialog] = useState(false);
@@ -71,6 +21,11 @@ export default function Cases() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [typeFilter, setTypeFilter] = useState("All Types");
+  const [dbClients, setDbClients] = useState([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+  const menuRef = useRef(null);
 
   const [formData, setFormData] = useState({
     caseTitle: "",
@@ -79,6 +34,7 @@ export default function Cases() {
     status: "active",
     assignedTo: "",
     caseDescription: "",
+    clientEmail: "",
   });
   
   const [alertMessage, setAlertMessage] = useState("");
@@ -115,24 +71,47 @@ export default function Cases() {
       }
     };
     fetchCases();
+
+    const fetchClients = async () => {
+      try {
+        const resp = await axios.get(`${import.meta.env.VITE_API_URL}/user/getclients`);
+        if (resp.data && resp.data.clients) {
+          setDbClients(resp.data.clients);
+        }
+      } catch (error) {
+        console.error("Error fetching clients:", error);
+      }
+    };
+    fetchClients();
   }, []);
 
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (openMenuId !== null) {
+      if (openMenuId !== null && menuRef.current && !menuRef.current.contains(event.target)) {
         setOpenMenuId(null);
       }
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowClientDropdown(false);
+      }
     };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openMenuId]);
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    let updatedData = { ...formData, [name]: value };
+
+    // Auto-fill email when a client is selected from the dropdown
+    if (name === "client" && value) {
+      const selectedClient = dbClients.find(c => c.name === value);
+      if (selectedClient) {
+        updatedData.clientEmail = selectedClient.email;
+      }
+    }
+
+    setFormData(updatedData);
   };
 
   const handleSubmit = async(e) => {
@@ -146,6 +125,7 @@ export default function Cases() {
         assignedTo: formData.assignedTo,
         caseDescription: formData.caseDescription,
         clientEmail: formData.clientEmail || "client@email.com",
+        userId: localStorage.getItem("userId"), // PASS LOGGED IN USER ID
       };
 
       let resp;
@@ -286,6 +266,7 @@ LegalFlow Team`);
       status: caseItem.status,
       assignedTo: caseItem.assigned,
       caseDescription: "",
+      clientEmail: caseItem.clientEmail || "",
     });
     setIsModalOpen(true);
   };
@@ -306,6 +287,22 @@ LegalFlow Team`);
     } catch (err) {
       console.error("Failed to update status:", err);
       alert("Failed to update status.");
+    }
+  };
+
+  const handleDeleteCase = async (caseId) => {
+    if (!window.confirm("Are you sure you want to delete this case? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/user/deletecase/${caseId}`);
+      setCases(cases.filter(c => c.id !== caseId));
+      setOpenMenuId(null);
+      alert("Case deleted successfully.");
+    } catch (err) {
+      console.error("Failed to delete case:", err);
+      alert("Failed to delete case. Please try again.");
     }
   };
 
@@ -340,7 +337,7 @@ LegalFlow Team`);
   const caseTypes = ["All Types", ...new Set(cases.map(c => c.type))];
 
   return (
-    <div className="bg-gray-100 min-h-screen p-6">
+    <div className="bg-gray-100 min-h-screen p-4 sm:p-6">
       {/* Success Message Toast */}
       {showSuccessMessage && (
         <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slide-in">
@@ -350,7 +347,7 @@ LegalFlow Team`);
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Cases</h1>
           <p className="text-gray-500 text-sm mt-1">Manage and track all your legal cases</p>
@@ -365,38 +362,40 @@ LegalFlow Team`);
       </div>
 
       {/* Search + Filters */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Search cases, clients, documents..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600 border border-gray-200 text-sm"
+            placeholder="Search cases, clients..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600 border border-gray-200 text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <select 
-          className="px-4 py-2 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option>All Status</option>
-          <option>Active</option>
-          <option>Pending</option>
-          <option>Closed</option>
-        </select>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <select 
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-600"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option>All Status</option>
+            <option>Active</option>
+            <option>Pending</option>
+            <option>Closed</option>
+          </select>
 
-        <select 
-          className="px-4 py-2 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer"
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
-          {caseTypes.map((type, idx) => (
-            <option key={idx}>{type}</option>
-          ))}
-        </select>
+          <select 
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-600"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            {caseTypes.map((type, idx) => (
+              <option key={idx}>{type}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Case Cards */}
@@ -428,11 +427,11 @@ LegalFlow Team`);
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500 mb-3">{caseItem.id}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <p className="text-sm text-gray-500 mb-4">{caseItem.id}</p>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-500 text-xs">Client</p>
-                        <p className="text-gray-900 font-medium text-sm">{caseItem.client}</p>
+                        <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">Client</p>
+                        <p className="text-gray-900 font-semibold">{caseItem.client}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs">Case Type</p>
@@ -443,8 +442,8 @@ LegalFlow Team`);
                         <p className="text-gray-900 text-sm">{caseItem.docs} docs</p>
                       </div>
                       <div>
-                        <p className="text-gray-500 text-xs">Next Hearing</p>
-                        <p className="text-gray-900 text-sm">{caseItem.nextHearing}</p>
+                        <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">Next Hearing</p>
+                        <p className="text-gray-900 font-semibold">{caseItem.nextHearing}</p>
                       </div>
                     </div>
                   </div>
@@ -468,7 +467,8 @@ LegalFlow Team`);
       {/* Global Dropdown Menu */}
       {openMenuId && (
         <div 
-          className="fixed z-50 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
+          ref={menuRef}
+          className="fixed z-50 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg animate-in fade-in zoom-in duration-200"
           style={{
             top: `${menuPosition.top}px`,
             right: `${menuPosition.right}px`,
@@ -496,6 +496,12 @@ LegalFlow Team`);
                   className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
                 >
                   <Edit size={14} /> Edit Case
+                </button>
+                <button
+                  onClick={() => handleDeleteCase(caseItem.id)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
+                >
+                  <X size={14} /> Delete Case
                 </button>
                 
                 {/* Change Status Submenu */}
@@ -534,9 +540,9 @@ LegalFlow Team`);
 
       {/* Modal - Add New Case */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-2">
+            <div className="px-6 py-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{editingCaseId ? "Edit Case" : "Add New Case"}</h2>
@@ -559,12 +565,49 @@ LegalFlow Team`);
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="relative" ref={dropdownRef}>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Client</label>
-                  <select name="client" value={formData.client} onChange={handleInputChange} className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600" required>
-                    <option value="">Select client</option>
-                    {clientsList.map((client, i) => (<option key={i} value={client}>{client}</option>))}
-                  </select>
+                  <input
+                    type="text"
+                    name="client"
+                    value={formData.client}
+                    autoComplete="off"
+                    placeholder="Search client name..."
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleInputChange(e);
+                      setShowClientDropdown(true);
+                    }}
+                    onFocus={() => setShowClientDropdown(true)}
+                    required
+                  />
+                  {showClientDropdown && formData.client && (
+                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                      {dbClients
+                        .filter(c => c.name.toLowerCase().includes(formData.client.toLowerCase()))
+                        .map((client, i) => (
+                          <div
+                            key={i}
+                            className="px-4 py-2 text-sm hover:bg-green-50 cursor-pointer border-b last:border-0 border-gray-100"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                client: client.name,
+                                clientEmail: client.email
+                              });
+                              setShowClientDropdown(false);
+                            }}
+                          >
+                            <p className="font-medium text-gray-900">{client.name}</p>
+                            <p className="text-xs text-gray-500">{client.email}</p>
+                          </div>
+                        ))}
+                      {dbClients.filter(c => c.name.toLowerCase().includes(formData.client.toLowerCase())).length === 0 && (
+                        <div className="px-4 py-3 text-xs text-gray-500 italic">No matching clients found</div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
@@ -599,9 +642,9 @@ LegalFlow Team`);
                 <textarea name="caseDescription" value={formData.caseDescription} onChange={handleInputChange} placeholder="Enter case details and notes" rows={4} className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 resize-none" />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button type="button" onClick={() => { setIsModalOpen(false); setEditingCaseId(null); }} className="px-5 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">Cancel</button>
-                <button type="submit" className="px-5 py-2 text-sm bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium">{editingCaseId ? "Save Changes" : "Create Case"}</button>
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-100">
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingCaseId(null); }} className="w-full sm:w-auto px-6 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">Cancel</button>
+                <button type="submit" className="w-full sm:w-auto px-6 py-2.5 text-sm bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium shadow-md">{editingCaseId ? "Save Changes" : "Create Case"}</button>
               </div>
             </form>
           </div>
@@ -610,8 +653,8 @@ LegalFlow Team`);
 
       {/* ALERT DIALOG BOX */}
       {showAlertDialog && selectedCase && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
-          <div className="bg-white rounded-xl w-[550px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+          <div className="bg-white rounded-2xl w-[550px] max-w-full max-h-[90vh] overflow-y-auto m-2">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <div>
@@ -720,16 +763,16 @@ LegalFlow Team`);
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
                   <button
                     onClick={() => setShowAlertDialog(false)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                    className="w-full sm:flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSendAlert}
-                    className="flex-1 px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium flex items-center justify-center gap-2"
+                    className="w-full sm:flex-1 px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium flex items-center justify-center gap-2 text-sm shadow-md"
                   >
                     <Send size={16} />
                     Send Alert

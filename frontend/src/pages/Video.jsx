@@ -14,7 +14,7 @@ export default function Video() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState("");
   const [status, setStatus] = useState("idle"); // 'idle' | 'loading' | 'success' | 'error'
-  
+
   const [users, setUsers] = useState([]);
   const [upcomingMeetings, setUpcomingMeetings] = useState([]); // State for dynamic meetings
 
@@ -68,7 +68,7 @@ export default function Video() {
       if (response.ok) {
         setStatus("success");
         fetchMeetings(); // REFRESH the list instantly after saving!
-        
+
         setTimeout(() => {
           setIsModalOpen(false);
           setSelectedEmail("");
@@ -97,7 +97,7 @@ export default function Video() {
         </div>
 
         {/* Added onClick to open modal */}
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 bg-[#166534] text-white text-[13px] font-medium px-4 py-2 rounded-md hover:bg-[#14532d] transition-colors"
         >
@@ -146,9 +146,9 @@ export default function Video() {
             </h3>
 
             {/* Added onClick to open modal */}
-            <QuickBtn 
-              icon={<Plus size={14} />} 
-              text="Schedule New Consultation" 
+            <QuickBtn
+              icon={<Plus size={14} />}
+              text="Schedule New Consultation"
               onClick={() => setIsModalOpen(true)}
             />
             <QuickBtn icon={<VideoIcon size={14} />} text="Start Instant Meeting" />
@@ -199,8 +199,8 @@ export default function Video() {
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-[18px] font-semibold text-gray-900">Send Booking Link</h2>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
+              <button
+                onClick={() => setIsModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X size={20} />
@@ -212,7 +212,7 @@ export default function Video() {
                 <label className="block text-[13px] font-medium text-gray-700 mb-1">
                   Select Client
                 </label>
-                
+
                 <select
                   required
                   value={selectedEmail}
@@ -293,7 +293,7 @@ function MeetingCard({ initials, name, caseName, time, duration, joinUrl }) {
         </button>
 
         {/* Updated Join button to open the Cal.com bookings URL */}
-        <button 
+        <button
           onClick={() => window.open(joinUrl || "https://cal.com/bookings", "_blank")}
           className="bg-[#166534] text-white px-4 py-[6px] rounded-md text-[12.5px] font-medium hover:bg-[#14532d] transition-colors"
         >
@@ -306,7 +306,7 @@ function MeetingCard({ initials, name, caseName, time, duration, joinUrl }) {
 
 function QuickBtn({ icon, text, onClick }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className="w-full flex items-center gap-2 border border-gray-200 rounded-md py-2 px-3 text-[13px] font-medium mb-3 hover:bg-gray-50 transition-colors"
     >
