@@ -60,80 +60,104 @@ const formatDateForAPI = (date) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 };
 
-/* -------------------- API SERVICE -------------------- */
+/* -------------------- API SERVICE (FIXED) -------------------- */
 
-const API_URL = "http://localhost:5000/api";
+// ✅ Correct Vite environment variable
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+  const headers = { "Content-Type": "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 };
 
 const calendarAPI = {
   getEvents: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_URL}/calendar/events${queryString ? `?${queryString}` : ""}`, {
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) throw new Error("Failed to fetch events");
+    const url = `${API_BASE}/api/calendar/events${queryString ? `?${queryString}` : ""}`;
+    console.log("Fetching events from:", url);
+
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch events");
+    }
     return response.json();
   },
 
   createEvent: async (eventData) => {
-    const response = await fetch(`${API_URL}/calendar/events`, {
+    const response = await fetch(`${API_BASE}/api/calendar/events`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(eventData),
     });
-    if (!response.ok) throw new Error("Failed to create event");
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to create event");
+    }
     return response.json();
   },
 
   updateEvent: async (id, eventData) => {
-    const response = await fetch(`${API_URL}/calendar/events/${id}`, {
+    const response = await fetch(`${API_BASE}/api/calendar/events/${id}`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify(eventData),
     });
-    if (!response.ok) throw new Error("Failed to update event");
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to update event");
+    }
     return response.json();
   },
 
   updateEventStatus: async (id, status) => {
-    const response = await fetch(`${API_URL}/calendar/events/${id}/status`, {
+    const response = await fetch(`${API_BASE}/api/calendar/events/${id}/status`, {
       method: "PATCH",
       headers: getAuthHeaders(),
       body: JSON.stringify({ status }),
     });
-    if (!response.ok) throw new Error("Failed to update event status");
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to update event status");
+    }
     return response.json();
   },
 
   deleteEvent: async (id) => {
-    const response = await fetch(`${API_URL}/calendar/events/${id}`, {
+    const response = await fetch(`${API_BASE}/api/calendar/events/${id}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     });
-    if (!response.ok) throw new Error("Failed to delete event");
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to delete event");
+    }
     return response.json();
   },
 
   getReminders: async () => {
-    const response = await fetch(`${API_URL}/calendar/reminders/upcoming`, {
+    const response = await fetch(`${API_BASE}/api/calendar/reminders/upcoming`, {
       headers: getAuthHeaders(),
     });
-    if (!response.ok) throw new Error("Failed to fetch reminders");
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch reminders");
+    }
     return response.json();
   },
 
   getStats: async () => {
-    const response = await fetch(`${API_URL}/calendar/stats`, {
+    const response = await fetch(`${API_BASE}/api/calendar/stats`, {
       headers: getAuthHeaders(),
     });
-    if (!response.ok) throw new Error("Failed to fetch stats");
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch stats");
+    }
     return response.json();
   },
 };
@@ -208,8 +232,11 @@ function AddEventModal({ isOpen, onClose, onAddEvent, selectedDate, editingEvent
         recurrenceEndDate: editingEvent.recurrenceEndDate || "",
         attendees: editingEvent.attendees || [],
       });
+      setShowRecurrence(editingEvent.recurrence && editingEvent.recurrence !== "none");
+    } else if (selectedDate) {
+      setFormData(prev => ({ ...prev, date: formatDateForAPI(selectedDate) }));
     }
-  }, [editingEvent]);
+  }, [editingEvent, selectedDate]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -772,10 +799,13 @@ export default function CalendarSection() {
 
   const handleAddEvent = async (newEvent) => {
     await loadEvents();
+    setShowModal(false);
   };
 
   const handleUpdateEvent = async (updatedEvent) => {
     await loadEvents();
+    setShowModal(false);
+    setEditingEvent(null);
   };
 
   const handleStatusChange = async (eventId, newStatus) => {
@@ -1035,9 +1065,9 @@ export default function CalendarSection() {
 
                 <div className="mt-2 flex items-center gap-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${ev.status === "completed" ? "bg-green-100 text-green-700" :
-                      ev.status === "cancelled" ? "bg-red-100 text-red-700" :
-                        ev.status === "in-progress" ? "bg-blue-100 text-blue-700" :
-                          "bg-yellow-100 text-yellow-700"
+                    ev.status === "cancelled" ? "bg-red-100 text-red-700" :
+                      ev.status === "in-progress" ? "bg-blue-100 text-blue-700" :
+                        "bg-yellow-100 text-yellow-700"
                     }`}>
                     {ev.status}
                   </span>
