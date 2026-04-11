@@ -25,7 +25,7 @@ const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 // ─── Document Viewer Component ────────────────────────────────────────────────
 function DocumentViewer({ document: doc, onClose, onDownload }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [viewData, setViewData] = useState(null);
+  const [viewData, setViewData] = useState(null); // { viewUrl, type }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const containerRef = useRef(null);
@@ -104,6 +104,7 @@ function DocumentViewer({ document: doc, onClose, onDownload }) {
       );
     }
 
+    // type === "other" — unsupported format
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center text-white">
@@ -123,9 +124,14 @@ function DocumentViewer({ document: doc, onClose, onDownload }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+      {/* Header */}
       <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg transition" title="Close">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-800 rounded-lg transition"
+            title="Close"
+          >
             <X size={20} />
           </button>
           <div>
@@ -137,15 +143,24 @@ function DocumentViewer({ document: doc, onClose, onDownload }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => onDownload(doc)} className="p-2 hover:bg-gray-800 rounded-lg transition" title="Download">
+          <button
+            onClick={() => onDownload(doc)}
+            className="p-2 hover:bg-gray-800 rounded-lg transition"
+            title="Download"
+          >
             <Download size={18} />
           </button>
-          <button onClick={toggleFullscreen} className="p-2 hover:bg-gray-800 rounded-lg transition" title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 hover:bg-gray-800 rounded-lg transition"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
             {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
         </div>
       </div>
 
+      {/* Viewer Body */}
       <div ref={containerRef} className="flex-1 bg-gray-800 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -159,7 +174,10 @@ function DocumentViewer({ document: doc, onClose, onDownload }) {
             <div className="text-center text-red-400">
               <p className="text-lg mb-2">Failed to load document</p>
               <p className="text-sm mb-4">{error}</p>
-              <button onClick={() => onDownload(doc)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <button
+                onClick={() => onDownload(doc)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
                 Download Instead
               </button>
             </div>
@@ -180,6 +198,7 @@ export default function Documents() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [viewerDoc, setViewerDoc] = useState(null);
 
+  // Upload modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [formData, setFormData] = useState({
@@ -187,19 +206,23 @@ export default function Documents() {
     docType: "Legal Filing",
   });
 
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("All Types");
   const [filterCase, setFilterCase] = useState("All Cases");
   const [viewMode, setViewMode] = useState("list");
 
+  // Analysis modal
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisDoc, setAnalysisDoc] = useState(null);
 
+  // Context menu
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
+  // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -214,11 +237,21 @@ export default function Documents() {
     });
   };
 
+  // ── Fetch documents ──────────────────────────────────────────────────────────
   const fetchDocuments = async () => {
     setLoading(true);
     setUploadMessage("");
     try {
-      const response = await fetch(`${apiUrl}/api/documents`);
+      const userId = localStorage.getItem("userId") || localStorage.getItem("id");
+      console.log("Frontend is sending userId:", userId);
+
+      if (!userId) {
+        setUploadMessage("Error: You are not logged in properly.");
+        setDocuments([]);
+        return;
+      }
+
+      const response = await fetch(`${apiUrl}/api/documents?userId=${userId}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to load documents.");
       setDocuments(data);
@@ -234,6 +267,7 @@ export default function Documents() {
     fetchDocuments();
   }, []);
 
+  // ── Upload ───────────────────────────────────────────────────────────────────
   const handleUploadClick = () => fileInputRef.current?.click();
 
   const handleFileChange = (event) => {
@@ -249,12 +283,15 @@ export default function Documents() {
     setIsModalOpen(false);
     setUploadMessage("Uploading...");
 
+    const userId = localStorage.getItem("userId") || localStorage.getItem("id");
     const payload = new FormData();
     payload.append("file", selectedFile);
     payload.append("caseName", formData.caseName);
     payload.append("documentType", formData.docType);
+    if (userId) payload.append("userId", userId);
 
     try {
+      // Use the RAG-enabled upload route if you have one, or regular upload
       const response = await fetch(`${apiUrl}/api/upload`, {
         method: "POST",
         body: payload,
@@ -263,7 +300,9 @@ export default function Documents() {
       if (!response.ok) throw new Error(data.error || "Upload failed");
 
       setDocuments((prev) => [data.document, ...prev]);
-      setUploadMessage(`Upload successful! AI Status: ${data.ragStatus || "Processed"}`);
+      setUploadMessage(
+        `Upload successful! AI Status: ${data.ragStatus || "Processed"}`
+      );
       setTimeout(() => setUploadMessage(""), 5000);
     } catch (error) {
       setUploadMessage(error.message);
@@ -276,6 +315,7 @@ export default function Documents() {
     }
   };
 
+  // ── Analyze ──────────────────────────────────────────────────────────────────
   const handleAnalyze = async (documentId) => {
     const doc = documents.find((d) => d._id === documentId);
     setAnalysisDoc(doc || null);
@@ -302,35 +342,24 @@ export default function Documents() {
     setAnalysisResult(null);
   };
 
-  // Modern Blob Download - completely bypasses browser native routing issues
-  const handleDownload = async (documentItem) => {
-    try {
-      setUploadMessage(`Preparing download for ${documentItem.originalName}...`);
-      const response = await fetch(`${apiUrl}/api/documents/${documentItem._id}/download`);
-      if (!response.ok) throw new Error("Download failed");
-
-      const blob = await response.blob();
-      const url = globalThis.window.URL.createObjectURL(blob);
-      const link = globalThis.document.createElement("a");
-      link.href = url;
-      link.download = documentItem.originalName;
-      globalThis.document.body.appendChild(link);
-      link.click();
-      globalThis.document.body.removeChild(link);
-      globalThis.window.URL.revokeObjectURL(url);
-      setUploadMessage("");
-    } catch (error) {
-      console.error(error);
-      setUploadMessage("Failed to download document.");
-      setTimeout(() => setUploadMessage(""), 3000);
-    }
+  // ── Download ─────────────────────────────────────────────────────────────────
+  const handleDownload = (documentItem) => {
+    // Create an anchor that points to our streaming download endpoint
+    const link = globalThis.document.createElement("a");
+    link.href = `${apiUrl}/api/documents/${documentItem._id}/download`;
+    link.download = documentItem.originalName;
+    globalThis.document.body.appendChild(link);
+    link.click();
+    globalThis.document.body.removeChild(link);
   };
 
+  // ── Open/View ────────────────────────────────────────────────────────────────
   const handleOpenDocument = (documentItem) => {
     setViewerDoc(documentItem);
     setActiveMenuId(null);
   };
 
+  // ── Delete ───────────────────────────────────────────────────────────────────
   const handleDeleteConfirm = (docId) => {
     setDeleteConfirmId(docId);
     setActiveMenuId(null);
@@ -357,6 +386,7 @@ export default function Documents() {
     }
   };
 
+  // ── Context menu ─────────────────────────────────────────────────────────────
   const handleToggleMenu = (docId, event) => {
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
@@ -376,6 +406,7 @@ export default function Documents() {
       globalThis.document.removeEventListener("click", handleClickOutside);
   }, [activeMenuId]);
 
+  // ── Filters ──────────────────────────────────────────────────────────────────
   const filterOptions = (items, field) => {
     const values = items.map((item) => item[field] || "Unassigned");
     return [
@@ -400,6 +431,7 @@ export default function Documents() {
   const typeOptions = filterOptions(documents, "documentType");
   const caseOptions = filterOptions(documents, "caseName");
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <input
@@ -409,6 +441,7 @@ export default function Documents() {
         onChange={handleFileChange}
       />
 
+      {/* Document Viewer Overlay */}
       {viewerDoc && (
         <DocumentViewer
           document={viewerDoc}
@@ -417,6 +450,7 @@ export default function Documents() {
         />
       )}
 
+      {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -452,6 +486,7 @@ export default function Documents() {
         </div>
       )}
 
+      {/* Upload Modal */}
       {isModalOpen && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -520,6 +555,7 @@ export default function Documents() {
         </div>
       )}
 
+      {/* Analysis Modal */}
       {analysisOpen && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
@@ -610,6 +646,7 @@ export default function Documents() {
         </div>
       )}
 
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Documents</h1>
@@ -640,6 +677,7 @@ export default function Documents() {
         </div>
       )}
 
+      {/* Filters */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center mb-6">
         <div className="flex items-center bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 flex-1">
           <Search size={16} className="text-gray-400 mr-2" />
@@ -691,6 +729,7 @@ export default function Documents() {
         </div>
       </div>
 
+      {/* Grid View */}
       {viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {loading ? (
@@ -759,6 +798,7 @@ export default function Documents() {
           )}
         </div>
       ) : (
+        /* List View */
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -775,19 +815,28 @@ export default function Documents() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
                     Loading documents...
                   </td>
                 </tr>
               ) : filteredDocuments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
                     No documents found.
                   </td>
                 </tr>
               ) : (
                 filteredDocuments.map((doc) => (
-                  <tr key={doc._id} className="hover:bg-gray-50/50 transition group">
+                  <tr
+                    key={doc._id}
+                    className="hover:bg-gray-50/50 transition group"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl shrink-0 group-hover:bg-white border transition">
@@ -874,6 +923,7 @@ export default function Documents() {
         </div>
       )}
 
+      {/* Global Context Menu */}
       {activeMenuId && (
         <div
           className="fixed z-50 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"

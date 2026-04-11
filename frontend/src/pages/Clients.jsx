@@ -76,7 +76,9 @@ export default function Clients() {
     setError(null);
 
     try {
-      const response = await fetch(`${apiUrl}/api/clients`);
+      // Pass the logged-in user ID to filter
+      const userId = localStorage.getItem("userId");
+      const response = await fetch(`${apiUrl}/api/clients?userId=${userId}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -93,17 +95,18 @@ export default function Clients() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/clients/stats/summary`);
+      // Pass the logged-in user ID to filter stats
+      const userId = localStorage.getItem("userId");
+      const response = await fetch(`${apiUrl}/api/clients/stats/summary?userId=${userId}`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Failed to load stats.");
       }
-      
+
       setStats(data);
     } catch (error) {
       console.error("Failed to fetch stats:", error);
-      // Don't show error to user for stats, just log it
     }
   };
 
@@ -155,17 +158,22 @@ export default function Clients() {
 
     try {
       let response;
+      const userId = localStorage.getItem("userId");
+
+      // Inject the userId into the payload when saving
+      const payload = { ...formData, userId };
+
       if (editingClient) {
         response = await fetch(`${apiUrl}/api/clients/${editingClient.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         });
       } else {
         response = await fetch(`${apiUrl}/api/clients`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         });
       }
 
@@ -177,11 +185,11 @@ export default function Clients() {
 
       setMessage(editingClient ? "Client updated successfully." : "Client added successfully.");
       setIsModalOpen(false);
-      
+
       // Refresh both clients and stats after adding/updating
       await fetchClients();
       await fetchStats();
-      
+
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
       setMessage(error.message);
@@ -204,11 +212,11 @@ export default function Clients() {
       setMessage("Client deleted successfully.");
       setIsDeleteModalOpen(false);
       setSelectedClient(null);
-      
+
       // Refresh both clients and stats after deletion
       await fetchClients();
       await fetchStats();
-      
+
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
       setMessage(error.message);
@@ -276,11 +284,10 @@ export default function Clients() {
       {/* Messages */}
       {message && (
         <div
-          className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm ${
-            message.includes("failed") || message.includes("Unable")
+          className={`mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm ${message.includes("failed") || message.includes("Unable")
               ? "border-red-200 text-red-600 bg-red-50"
               : "border-green-100 text-green-700 bg-green-50"
-          }`}
+            }`}
         >
           {message}
         </div>
@@ -302,7 +309,7 @@ export default function Clients() {
         </button>
       </div>
 
-      {/* Stats Cards - These are now dynamic and update in real-time */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-3">
           <p className="text-xs text-gray-500">Total Clients</p>
@@ -330,7 +337,6 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* Rest of your component remains the same */}
       {/* Filters */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center mb-6">
         <div className="flex items-center bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 flex-1">
@@ -487,7 +493,7 @@ export default function Clients() {
           )}
         </div>
       ) : (
-        /* List View - Same as before */
+        /* List View */
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -824,9 +830,8 @@ function ClientDetailModal({ client, onClose, onEdit }) {
                     {client.type}
                   </span>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      client.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
-                    }`}
+                    className={`text-xs px-2 py-0.5 rounded-full ${client.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                      }`}
                   >
                     {client.status === "active" ? "Active" : "Inactive"}
                   </span>
@@ -856,9 +861,8 @@ function ClientDetailModal({ client, onClose, onEdit }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium transition relative ${
-                activeTab === tab.id ? "text-green-600" : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2.5 text-sm font-medium transition relative ${activeTab === tab.id ? "text-green-600" : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               {tab.label}
               {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600 rounded-full" />}
@@ -960,4 +964,4 @@ function ClientDetailModal({ client, onClose, onEdit }) {
       </div>
     </div>
   );
-}
+} 

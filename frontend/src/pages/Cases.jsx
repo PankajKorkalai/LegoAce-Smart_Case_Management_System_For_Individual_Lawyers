@@ -36,7 +36,7 @@ export default function Cases() {
     caseDescription: "",
     clientEmail: "",
   });
-  
+
   const [alertMessage, setAlertMessage] = useState("");
   const [alertSubject, setAlertSubject] = useState("");
   const [sendVia, setSendVia] = useState({
@@ -49,7 +49,8 @@ export default function Cases() {
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const resp = await axios.get(`${import.meta.env.VITE_API_URL}/user/getcases`);
+        const userId = localStorage.getItem("userId");
+        const resp = await axios.get(`${import.meta.env.VITE_API_URL}/user/getcases?userId=${userId}`);
         if (resp.data && resp.data.cases) {
           const fetchedCases = resp.data.cases.map((c) => ({
             id: c._id || `CASE-${Math.random().toString(36).substr(2, 5)}`,
@@ -74,7 +75,8 @@ export default function Cases() {
 
     const fetchClients = async () => {
       try {
-        const resp = await axios.get(`${import.meta.env.VITE_API_URL}/user/getclients`);
+        const userId = localStorage.getItem("userId");
+        const resp = await axios.get(`${import.meta.env.VITE_API_URL}/user/getclients?userId=${userId}`);
         if (resp.data && resp.data.clients) {
           setDbClients(resp.data.clients);
         }
@@ -114,7 +116,7 @@ export default function Cases() {
     setFormData(updatedData);
   };
 
-  const handleSubmit = async(e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const casePayload = {
@@ -134,7 +136,7 @@ export default function Cases() {
       } else {
         resp = await axios.post(`${import.meta.env.VITE_API_URL}/user/addcase`, casePayload);
       }
-      
+
       if (resp.data && resp.data.case) {
         const c = resp.data.case;
         const mappedCase = {
@@ -150,7 +152,7 @@ export default function Cases() {
           nextHearing: c.nextHearing || "TBD",
           assigned: c.assignedTo || "Unassigned"
         };
-        
+
         if (editingCaseId) {
           setCases(cases.map(existing => existing.id === editingCaseId ? mappedCase : existing));
         } else {
@@ -210,12 +212,12 @@ LegalFlow Team`);
   const handleSendAlert = async (e) => {
     e.preventDefault();
     const selectedMethods = Object.keys(sendVia).filter(key => sendVia[key]);
-    
+
     if (selectedMethods.length === 0) {
       alert("Please select at least one method (Email, SMS, or WhatsApp)");
       return;
     }
-    
+
     try {
       if (sendVia.email) {
         const resp = await axios.post(`${import.meta.env.VITE_API_URL}/user/sendalert`, {
@@ -228,13 +230,13 @@ LegalFlow Team`);
       }
 
       // Store sent alert in case object (for demo)
-      const updatedCases = cases.map(c => 
-        c.id === selectedCase.id 
+      const updatedCases = cases.map(c =>
+        c.id === selectedCase.id
           ? { ...c, lastAlert: { message: alertSubject, date: new Date().toISOString(), methods: selectedMethods } }
           : c
       );
       setCases(updatedCases);
-      
+
       setShowAlertDialog(false);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
@@ -274,7 +276,7 @@ LegalFlow Team`);
   const handleChangeStatus = async (caseItem, newStatus) => {
     try {
       const resp = await axios.put(`${import.meta.env.VITE_API_URL}/user/updatestatus/${caseItem.id}`, { status: newStatus });
-      const updatedCases = cases.map(c => 
+      const updatedCases = cases.map(c =>
         c.id === caseItem.id ? { ...c, status: newStatus } : c
       );
       setCases(updatedCases);
@@ -321,15 +323,15 @@ LegalFlow Team`);
   // Filter cases based on search and filters
   const filteredCases = cases.filter(caseItem => {
     const matchesSearch = caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         caseItem.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         caseItem.id.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "All Status" || 
-                         caseItem.status.toLowerCase() === statusFilter.toLowerCase();
-    
-    const matchesType = typeFilter === "All Types" || 
-                       caseItem.type === typeFilter;
-    
+      caseItem.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      caseItem.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = statusFilter === "All Status" ||
+      caseItem.status.toLowerCase() === statusFilter.toLowerCase();
+
+    const matchesType = typeFilter === "All Types" ||
+      caseItem.type === typeFilter;
+
     return matchesSearch && matchesStatus && matchesType;
   });
 
@@ -375,7 +377,7 @@ LegalFlow Team`);
         </div>
 
         <div className="flex gap-2 w-full sm:w-auto">
-          <select 
+          <select
             className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-600"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -386,7 +388,7 @@ LegalFlow Team`);
             <option>Closed</option>
           </select>
 
-          <select 
+          <select
             className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white shadow-sm border border-gray-200 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-600"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -466,7 +468,7 @@ LegalFlow Team`);
 
       {/* Global Dropdown Menu */}
       {openMenuId && (
-        <div 
+        <div
           ref={menuRef}
           className="fixed z-50 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg animate-in fade-in zoom-in duration-200"
           style={{
@@ -503,7 +505,7 @@ LegalFlow Team`);
                 >
                   <X size={14} /> Delete Case
                 </button>
-                
+
                 {/* Change Status Submenu */}
                 <div className="relative group">
                   <button
@@ -663,7 +665,7 @@ LegalFlow Team`);
                     Send Alert to Client
                   </h2>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowAlertDialog(false)}
                   className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
                 >
@@ -710,7 +712,7 @@ LegalFlow Team`);
                       <input
                         type="checkbox"
                         checked={sendVia.email}
-                        onChange={(e) => setSendVia({...sendVia, email: e.target.checked})}
+                        onChange={(e) => setSendVia({ ...sendVia, email: e.target.checked })}
                         className="w-4 h-4 text-green-600"
                       />
                       <Mail size={18} className="text-gray-500" />
@@ -719,12 +721,12 @@ LegalFlow Team`);
                         <p className="text-xs text-gray-500">{selectedCase.clientEmail}</p>
                       </div>
                     </label>
-                    
+
                     <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
                       <input
                         type="checkbox"
                         checked={sendVia.sms}
-                        onChange={(e) => setSendVia({...sendVia, sms: e.target.checked})}
+                        onChange={(e) => setSendVia({ ...sendVia, sms: e.target.checked })}
                         className="w-4 h-4 text-green-600"
                       />
                       <Phone size={18} className="text-gray-500" />
@@ -733,12 +735,12 @@ LegalFlow Team`);
                         <p className="text-xs text-gray-500">{selectedCase.clientPhone}</p>
                       </div>
                     </label>
-                    
+
                     <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
                       <input
                         type="checkbox"
                         checked={sendVia.whatsapp}
-                        onChange={(e) => setSendVia({...sendVia, whatsapp: e.target.checked})}
+                        onChange={(e) => setSendVia({ ...sendVia, whatsapp: e.target.checked })}
                         className="w-4 h-4 text-green-600"
                       />
                       <Send size={18} className="text-gray-500" />
@@ -748,10 +750,10 @@ LegalFlow Team`);
                       </div>
                     </label>
 
-                          <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
                       <input
                         type="checkbox"
-                      
+
                         className="w-4 h-4 text-green-600"
                       />
                       <Phone size={18} className="text-gray-500" />

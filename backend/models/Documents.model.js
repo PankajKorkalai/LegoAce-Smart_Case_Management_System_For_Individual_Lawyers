@@ -37,6 +37,11 @@ const DocumentSchema = new mongoose.Schema(
       default: "system",
       trim: true,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
     cloudinaryUrl: {
       type: String,
       required: true,

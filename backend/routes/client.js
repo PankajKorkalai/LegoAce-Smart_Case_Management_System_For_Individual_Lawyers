@@ -133,7 +133,6 @@ const initializeDummyData = async () => {
     const count = await Client.countDocuments();
     if (count === 0) {
       await Client.insertMany(initialClients);
-      // console.log("✅ Dummy client data initialized");
     }
   } catch (error) {
     console.error("Error initializing dummy data:", error);
@@ -142,10 +141,13 @@ const initializeDummyData = async () => {
 
 initializeDummyData();
 
-// GET all clients
+// GET all clients (Filtered by Lawyer)
 router.get("/clients", async (req, res) => {
   try {
-    const clients = await Client.find().sort({ createdAt: -1 });
+    const { userId } = req.query;
+    const query = userId ? { createdBy: userId } : {}; // Apply filter if userId is provided
+    
+    const clients = await Client.find(query).sort({ createdAt: -1 });
     res.json(clients);
   } catch (error) {
     console.error("Failed to fetch clients:", error);
@@ -167,15 +169,18 @@ router.get("/clients/:id", async (req, res) => {
   }
 });
 
-// GET client statistics
+// GET client statistics (Filtered by Lawyer)
 router.get("/clients/stats/summary", async (req, res) => {
   try {
-    const total = await Client.countDocuments();
-    const active = await Client.countDocuments({ status: "active" });
-    const corporate = await Client.countDocuments({ type: "corporate" });
-    const individual = await Client.countDocuments({ type: "individual" });
+    const { userId } = req.query;
+    const query = userId ? { createdBy: userId } : {}; // Apply filter if userId is provided
 
-    const clients = await Client.find();
+    const total = await Client.countDocuments(query);
+    const active = await Client.countDocuments({ ...query, status: "active" });
+    const corporate = await Client.countDocuments({ ...query, type: "corporate" });
+    const individual = await Client.countDocuments({ ...query, type: "individual" });
+
+    const clients = await Client.find(query);
     const totalCases = clients.reduce((sum, client) => sum + client.totalCases, 0);
     const activeCases = clients.reduce((sum, client) => sum + client.activeCases, 0);
 
@@ -196,7 +201,8 @@ router.get("/clients/stats/summary", async (req, res) => {
 // POST add new client
 router.post("/clients", async (req, res) => {
   try {
-    const { name, type, status, email, phone, company, address, notes } = req.body;
+    // Extracted userId from the body payload
+    const { name, type, status, email, phone, company, address, notes, userId } = req.body;
 
     if (!name || !email || !phone || !address) {
       return res.status(400).json({ error: "Missing required fields: name, email, phone, address" });
@@ -230,6 +236,7 @@ router.post("/clients", async (req, res) => {
       activities: [],
       lastContact: new Date().toISOString().split("T")[0],
       createdAt: new Date().toISOString().split("T")[0],
+      createdBy: userId, // Link the client to the specific lawyer
     });
 
     const savedClient = await newClient.save();
