@@ -1,3 +1,4 @@
+
 const express = require("express");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
@@ -33,7 +34,7 @@ cloudinary.config({
 // Middleware to verify token
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-  
+
   if (!token) {
     return res.status(401).json({ error: "No token provided" });
   }
@@ -51,10 +52,10 @@ const verifyToken = (req, res, next) => {
 router.get("/profile", verifyToken, async (req, res) => {
   try {
     const user = await UserModel.findById(req.userId).select("-password");
-    
+
     if (!user) {
-        console.log("user not found");
-        
+      console.log("user not found");
+
       return res.status(404).json({ error: "User not found" });
     }
 
@@ -108,7 +109,7 @@ router.put("/profile/personal-info", verifyToken, async (req, res) => {
         return res.status(400).json({ error: "Email already in use" });
       }
       updateData.email = email;
-      
+
       // Update name field for backward compatibility
       if (firstName && lastName) {
         updateData.name = `${firstName} ${lastName}`;
@@ -192,7 +193,7 @@ router.post("/profile/upload-picture", verifyToken, upload.single("profilePictur
     }
 
     const user = await UserModel.findById(req.userId);
-    
+
     // Delete old profile picture from Cloudinary if exists
     if (user.profilePicture?.publicId) {
       await cloudinary.uploader.destroy(user.profilePicture.publicId);
@@ -236,7 +237,7 @@ router.post("/profile/upload-picture", verifyToken, upload.single("profilePictur
 router.delete("/profile/picture", verifyToken, async (req, res) => {
   try {
     const user = await UserModel.findById(req.userId);
-    
+
     if (user.profilePicture?.publicId) {
       await cloudinary.uploader.destroy(user.profilePicture.publicId);
     }
@@ -264,8 +265,8 @@ router.get("/profile/activity-stats", verifyToken, async (req, res) => {
     const userCaseTitles = userCases.map(c => c.caseTitle);
 
     // Count documents associated with these cases
-    const documentCount = await DocumentModel.countDocuments({ 
-      caseName: { $in: userCaseTitles } 
+    const documentCount = await DocumentModel.countDocuments({
+      caseName: { $in: userCaseTitles }
     });
 
     // Count unique clients in these cases
