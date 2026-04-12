@@ -304,6 +304,17 @@ console.log("AUTH:", process.env.TWILIO_AUTH);
       to: `+91${phone}`,
     });
 
+
+    await client.calls.create({
+  twiml: `<Response>
+            <Say voice="alice">
+              ${message}
+            </Say>
+          </Response>`,
+  to: `+91${phone}`,
+  from: process.env.TWILIO_NUMBER,
+});
+
     res.json({ message: "Alert sent successfully" });
   } catch (err) {
     console.error("Error sending alert:", err);
