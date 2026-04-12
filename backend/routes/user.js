@@ -213,11 +213,10 @@ Userrouter.post("/addcase", async (req, res) => {
   }
 });
 
-// GET all cases (Filtered by Lawyer)
+// GET all cases (Now global)
 Userrouter.get("/getcases", async (req, res) => {
   try {
-    const { userId } = req.query;
-    const query = userId ? { createdBy: userId } : {};
+    const query = {}; // Global visibility
 
     const cases = await caseModel.find(query).sort({ createdAt: -1 });
     res.json({ cases });
@@ -227,11 +226,10 @@ Userrouter.get("/getcases", async (req, res) => {
   }
 });
 
-// GET all clients for the Add Case dropdown (Filtered by Lawyer)
+// GET all clients for the Add Case dropdown (Now global)
 Userrouter.get("/getclients", async (req, res) => {
   try {
-    const { userId } = req.query;
-    const query = userId ? { createdBy: userId } : {};
+    const query = {}; // Global visibility
 
     const clients = await clientModel.find(query).sort({ name: 1 });
     res.json({ clients });
