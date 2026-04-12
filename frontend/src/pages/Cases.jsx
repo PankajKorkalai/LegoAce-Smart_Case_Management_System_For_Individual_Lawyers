@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, Plus, X, MoreVertical, Eye, Bell, Edit, RefreshCw, Mail, Phone, Send, AlertTriangle, CheckCircle } from "lucide-react";
+import { Search, Plus, X, MoreVertical, Eye, Bell, Edit, RefreshCw, Mail, Phone, Send, AlertTriangle, CheckCircle, Calendar } from "lucide-react";
 import axios from "axios";
 const attorneys = [
   "Adv. Pankaj Korkalai",
@@ -26,6 +26,8 @@ export default function Cases() {
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const menuRef = useRef(null);
+  const [showHearingModal, setShowHearingModal] = useState(false);
+  const [tempHearingDate, setTempHearingDate] = useState("");
 
   const [formData, setFormData] = useState({
     caseTitle: "",
@@ -313,6 +315,40 @@ LegalFlow Team`);
       alert("Failed to delete case. Please try again.");
     }
   };
+  
+  const handleUpdateHearingDate = async (e) => {
+    e.preventDefault();
+    if (!selectedCase) return;
+    
+    try {
+      const resp = await axios.put(`${import.meta.env.VITE_API_URL}/user/updatecase/${selectedCase.id}`, {
+        nextHearing: tempHearingDate
+      });
+      
+      if (resp.data && resp.data.case) {
+        setCases(cases.map(c => 
+          c.id === selectedCase.id ? { ...c, nextHearing: tempHearingDate || "TBD" } : c
+        ));
+        setShowHearingModal(false);
+        setSelectedCase(null);
+        setTempHearingDate("");
+        alert("Next hearing date updated successfully!");
+      }
+    } catch (err) {
+      console.error("Error updating hearing date:", err);
+      alert("Failed to update hearing date.");
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString || dateString === "TBD") return "TBD";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return dateString;
+    }
+  };
 
   const getPriorityColor = (priority) => {
     if (priority === "high") return "bg-red-100 text-red-700";
@@ -451,7 +487,7 @@ LegalFlow Team`);
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">Next Hearing</p>
-                        <p className="text-gray-900 font-semibold">{caseItem.nextHearing}</p>
+                        <p className="text-gray-900 font-semibold">{formatDate(caseItem.nextHearing)}</p>
                       </div>
                     </div>
                   </div>
@@ -498,6 +534,17 @@ LegalFlow Team`);
                   className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
                 >
                   <Bell size={14} /> Send Alerts
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedCase(caseItem);
+                    setTempHearingDate(caseItem.nextHearing !== "TBD" ? new Date(caseItem.nextHearing).toISOString().split('T')[0] : "");
+                    setShowHearingModal(true);
+                    setOpenMenuId(null);
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                >
+                  <Calendar size={14} /> Set Hearing Date
                 </button>
                 <button
                   onClick={() => handleEditCase(caseItem)}
@@ -793,6 +840,61 @@ LegalFlow Team`);
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - Update Hearing Date */}
+      {showHearingModal && selectedCase && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[250] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full m-2 animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Calendar size={20} className="text-green-600" />
+                  Set Hearing Date
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">{selectedCase.title}</p>
+              </div>
+              <button 
+                onClick={() => { setShowHearingModal(false); setSelectedCase(null); }} 
+                className="text-gray-400 hover:text-gray-600 transition p-1 rounded-full hover:bg-gray-100"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateHearingDate} className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Next Hearing Date</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={tempHearingDate}
+                    onChange={(e) => setTempHearingDate(e.target.value)}
+                    className="w-full pl-3 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition-all"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2 italic">Select the date for the next scheduled court hearing.</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => { setShowHearingModal(false); setSelectedCase(null); }}
+                  className="px-6 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-6 py-2.5 text-sm bg-green-700 text-white rounded-xl hover:bg-green-800 transition font-medium shadow-md flex items-center justify-center gap-2"
+                >
+                  Save Date
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
