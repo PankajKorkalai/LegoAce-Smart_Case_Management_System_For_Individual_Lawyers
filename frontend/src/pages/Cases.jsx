@@ -227,7 +227,8 @@ LegalFlow Team`);
         const resp = await axios.post(`${import.meta.env.VITE_API_URL}/user/sendalert`, {
           email: selectedCase.clientEmail,
           subject: alertSubject,
-          message: alertMessage
+          message: alertMessage,
+          phone: selectedCase.clientPhone,
         });
         console.log("=== ALERT EMAIL DISPATCHED ===");
         console.log("Backend response:", resp.data.message);

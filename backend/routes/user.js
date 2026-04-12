@@ -14,6 +14,10 @@ const JWT_KEY = process.env.JWT_KEY;
 const caseModel = require("../models/CaseModel");
 const clientModel = require("../models/Clients.model");
 
+const twilio = require("twilio");
+
+const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
+
 Userrouter.post("/register", async function (req, res) {
   console.log("register api called");
   console.log("body ", req.body);
@@ -281,13 +285,24 @@ const sendAlertEmail = require("../utils/sendAlertEmail");
 
 Userrouter.post("/sendalert", async (req, res) => {
   try {
-    const { email, subject, message } = req.body;
+    const { email, subject, message , phone} = req.body;
+
+    console.log("SID:", process.env.TWILIO_SID);
+console.log("AUTH:", process.env.TWILIO_AUTH);
+    
+    console.log("phone no", phone);
 
     if (!email || !subject || !message) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     await sendAlertEmail(email, subject, message);
+
+      await client.messages.create({
+      body: `${message}\n\n- LegoAce Legalflow`,
+      from: process.env.TWILIO_NUMBER,
+      to: `+91${phone}`,
+    });
 
     res.json({ message: "Alert sent successfully" });
   } catch (err) {
