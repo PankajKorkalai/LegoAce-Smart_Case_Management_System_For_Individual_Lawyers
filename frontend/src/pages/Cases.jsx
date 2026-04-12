@@ -35,6 +35,7 @@ export default function Cases() {
     assignedTo: "",
     caseDescription: "",
     clientEmail: "",
+    clientPhone: "",
   });
 
   const [alertMessage, setAlertMessage] = useState("");
@@ -59,7 +60,7 @@ export default function Cases() {
             priority: c.priority || 'medium',
             client: c.client,
             clientEmail: c.clientEmail || "",
-            clientPhone: "+1 (555) 000-0000",
+            clientPhone: c.clientPhone || "",
             type: "General",
             docs: c.documentsCount || 0,
             nextHearing: c.nextHearing || "TBD",
@@ -110,6 +111,7 @@ export default function Cases() {
       const selectedClient = dbClients.find(c => c.name === value);
       if (selectedClient) {
         updatedData.clientEmail = selectedClient.email;
+        updatedData.clientPhone = selectedClient.phone;
       }
     }
 
@@ -127,6 +129,7 @@ export default function Cases() {
         assignedTo: formData.assignedTo,
         caseDescription: formData.caseDescription,
         clientEmail: formData.clientEmail || "client@email.com",
+        clientPhone: formData.clientPhone || "",
         userId: localStorage.getItem("userId"), // PASS LOGGED IN USER ID
       };
 
@@ -146,7 +149,7 @@ export default function Cases() {
           priority: c.priority || 'medium',
           client: c.client,
           clientEmail: c.clientEmail,
-          clientPhone: "+1 (555) 000-0000",
+          clientPhone: c.clientPhone,
           type: "General",
           docs: c.documentsCount || 0,
           nextHearing: c.nextHearing || "TBD",
@@ -173,6 +176,7 @@ export default function Cases() {
         status: "active",
         assignedTo: "",
         caseDescription: "",
+        clientPhone: "",
       });
     } catch (err) {
       console.error("Error adding case:", err);
@@ -269,6 +273,7 @@ LegalFlow Team`);
       assignedTo: caseItem.assigned,
       caseDescription: "",
       clientEmail: caseItem.clientEmail || "",
+      clientPhone: caseItem.clientPhone || "",
     });
     setIsModalOpen(true);
   };
@@ -565,6 +570,10 @@ LegalFlow Team`);
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Client Email</label>
                 <input type="email" name="clientEmail" value={formData.clientEmail} onChange={handleInputChange} placeholder="Enter client email" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600" required />
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Client Phone</label>
+                <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleInputChange} placeholder="Enter client phone" className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600" required />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative" ref={dropdownRef}>
@@ -596,7 +605,8 @@ LegalFlow Team`);
                               setFormData({
                                 ...formData,
                                 client: client.name,
-                                clientEmail: client.email
+                                clientEmail: client.email,
+                                clientPhone: client.phone
                               });
                               setShowClientDropdown(false);
                             }}
