@@ -145,7 +145,7 @@ initializeDummyData();
 router.get("/clients", async (req, res) => {
   try {
     const { userId } = req.query;
-    const query = userId ? { createdBy: userId } : {}; // Apply filter if userId is provided
+    const query = {}; // Fetch all clients irrespective of selection
     
     const clients = await Client.find(query).sort({ createdAt: -1 });
     res.json(clients);
@@ -173,7 +173,7 @@ router.get("/clients/:id", async (req, res) => {
 router.get("/clients/stats/summary", async (req, res) => {
   try {
     const { userId } = req.query;
-    const query = userId ? { createdBy: userId } : {}; // Apply filter if userId is provided
+    const query = {}; // Fetch all statistics irrespective of selection
 
     const total = await Client.countDocuments(query);
     const active = await Client.countDocuments({ ...query, status: "active" });

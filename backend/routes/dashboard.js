@@ -26,22 +26,20 @@ router.get("/stats", verifyToken, async (req, res) => {
     const userId = req.userId;
 
     // 1. Header Metrics
-    const activeCasesCount = await CaseModel.countDocuments({ createdBy: userId, status: "active" });
-    const totalClientsCount = await ClientModel.countDocuments({ createdBy: userId });
+    const activeCasesCount = await CaseModel.countDocuments({ status: "active" });
+    const totalClientsCount = await ClientModel.countDocuments({});
     
     // For documents, we count docs belonging to user's cases
-    const userCases = await CaseModel.find({ createdBy: userId });
+    const userCases = await CaseModel.find({});
     const userCaseTitles = userCases.map(c => c.caseTitle);
     const totalDocsCount = await DocumentModel.countDocuments({ caseName: { $in: userCaseTitles } });
     
     const upcomingHearingsCount = await CaseModel.countDocuments({ 
-        createdBy: userId, 
         nextHearing: { $gte: new Date() } 
     });
 
     // 2. Case Status Distribution (Pie Chart)
     const statusDistribution = await CaseModel.aggregate([
-      { $match: { createdBy: new (require("mongoose").Types.ObjectId)(userId) } },
       { $group: { _id: "$status", value: { $sum: 1 } } }
     ]);
 
@@ -61,7 +59,6 @@ router.get("/stats", verifyToken, async (req, res) => {
     const trends = await CaseModel.aggregate([
       { 
         $match: { 
-          createdBy: new (require("mongoose").Types.ObjectId)(userId),
           createdAt: { $gte: sixMonthsAgo }
         } 
       },
@@ -97,13 +94,12 @@ router.get("/stats", verifyToken, async (req, res) => {
     }
 
     // 4. Recent Cases
-    const recentCases = await CaseModel.find({ createdBy: userId })
+    const recentCases = await CaseModel.find({})
       .sort({ createdAt: -1 })
       .limit(5);
 
     // 5. Upcoming Events
     const recentMeetings = await MeetingModel.find({ 
-      createdBy: userId,
       meetingTime: { $gte: new Date().toISOString() } 
     }).sort({ meetingTime: 1 }).limit(4);
 

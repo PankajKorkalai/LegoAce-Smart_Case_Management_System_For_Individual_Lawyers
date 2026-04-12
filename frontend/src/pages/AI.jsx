@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, Send, RotateCcw, FileText, Scale, AlertTriangle, Lightbulb, User } from "lucide-react";
 import axios from "axios";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function AI() {
   const [messages, setMessages] = useState([
@@ -96,7 +98,13 @@ export default function AI() {
                 </div>
 
                 <div className={`${msg.sender === "user" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-800"} px-4 py-3 rounded-xl max-w-lg text-sm shadow-sm`}>
-                  <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
+                  {msg.sender === "user" ? (
+                    <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
+                  ) : (
+                    <div className="prose prose-sm max-w-none text-inherit leading-relaxed">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
