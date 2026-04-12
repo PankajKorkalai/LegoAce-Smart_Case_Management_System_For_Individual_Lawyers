@@ -3,7 +3,7 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const Document = require("../models/Documents.model");
 const axios = require("axios");
-const { GoogleGenerativeAI } = require("@google/generative-ai"); // Standardized SDK
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const router = express.Router();
 
@@ -20,10 +20,22 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ─── GET all documents ────────────────────────────────────────────────────────
+// ─── GET all documents (Filtered by Lawyer) ───────────────────────────────────
 router.get("/documents", async (req, res) => {
   try {
-    const documents = await Document.find().sort({ createdAt: -1 });
+    const { userId } = req.query;
+    console.log("Fetching documents for userId:", userId);
+
+    // STRICT CHECK: Impossible to accidentally fetch all documents
+    if (!userId || userId === "undefined" || userId === "null") {
+      console.log("No valid userId provided. Returning empty array.");
+      return res.json([]); 
+    }
+
+    // STRICT QUERY: Only fetch documents created by this user
+    const documents = await Document.find({ createdBy: userId }).sort({ createdAt: -1 });
+    
+    console.log(`Found ${documents.length} documents for this user.`);
     res.json(documents);
   } catch (error) {
     console.error("Failed to fetch documents:", error);
@@ -42,6 +54,7 @@ router.get("/documents/:id/view", async (req, res) => {
     const fileUrl = cloudinary.url(document.publicId, {
       resource_type: document.resourceType || "auto",
       secure: true,
+      sign_url: true, 
     });
 
     const { mimeType } = document;
@@ -85,10 +98,10 @@ router.get("/documents/:id/download", async (req, res) => {
       return res.status(404).json({ error: "Document not found." });
     }
 
-    // Clean URL without flags ensures Axios can fetch the stream properly
     const fileUrl = cloudinary.url(document.publicId, {
       resource_type: document.resourceType || "auto",
       secure: true,
+      sign_url: true,
     });
 
     const response = await axios({
@@ -126,7 +139,6 @@ router.get("/documents/:id/analyze", async (req, res) => {
       return res.status(500).json({ error: "Gemini API key is not configured." });
     }
 
-    // Initialize standard Generative AI client
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -155,6 +167,7 @@ Analyze this legal document thoroughly and respond ONLY with a valid JSON object
         const fileUrl = cloudinary.url(publicId, {
           resource_type: resourceType || "auto",
           secure: true,
+          sign_url: true,
         });
 
         const fileResponse = await axios({
@@ -177,11 +190,10 @@ Analyze this legal document thoroughly and respond ONLY with a valid JSON object
         aiResponseText = response.response.text();
       } catch (fetchError) {
         console.error("Could not fetch file for inline analysis:", fetchError.message);
-        aiResponseText = null; // Trigger fallback
+        aiResponseText = null; 
       }
     }
 
-    // Fallback to metadata analysis if inline failed or type is unsupported (e.g. Word Docs)
     if (!aiResponseText) {
       const metaPrompt = `You are a professional legal AI assistant.
 Based on the following document metadata, provide a meaningful analysis.
@@ -229,7 +241,7 @@ Document Metadata:
   }
 });
 
-// ─── DELETE /documents/:id  →  removes from Cloudinary + MongoDB ──────────────
+// ─── DELETE /documents/:id ────────────────────────────────────────────────────
 router.delete("/documents/:id", async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -238,7 +250,6 @@ router.delete("/documents/:id", async (req, res) => {
     }
 
     try {
-      // Must use exact resource type for successful deletion
       await cloudinary.uploader.destroy(document.publicId, {
         resource_type: document.resourceType, 
         invalidate: true,
@@ -268,7 +279,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "No file uploaded." });
     }
 
-    const { caseName, documentType } = req.body;
+    const { caseName, documentType, userId } = req.body;
     const file = req.file;
 
     const base64File = file.buffer.toString("base64");
@@ -278,8 +289,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       folder: "legal_documents",
       resource_type: "auto",
       access_mode: "public",
-      use_filename: true,    // Added: Ensures the extension (.pdf, .docx) is kept for viewers
-      unique_filename: true, // Added: Prevents overwriting files with the same name
+      use_filename: true,    
+      unique_filename: true, 
     });
 
     const formatBytes = (bytes) => {
@@ -297,7 +308,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       caseName: caseName || "Unassigned",
       documentType: documentType || "Uploaded Document",
       status: "processed",
-      uploadedBy: "Anonymous",
+      uploadedBy: "Lawyer",
+      createdBy: userId, 
       cloudinaryUrl: uploadResult.secure_url,
       publicId: uploadResult.public_id,
       resourceType: uploadResult.resource_type,

@@ -918,7 +918,6 @@ export default function Profile() {
                       </p>
                     </div>
                   </div>
-v>
                 </div>
               </div>
             </div>

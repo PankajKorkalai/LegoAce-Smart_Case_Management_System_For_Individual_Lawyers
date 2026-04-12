@@ -194,7 +194,7 @@ Userrouter.post("/addcase", async (req, res) => {
       caseDescription,
       nextHearing,
       documentsCount,
-      createdBy: user._id
+      createdBy: user._id // Link case to lawyer
     });
 
     user.cases.push(newcase._id);
@@ -213,9 +213,13 @@ Userrouter.post("/addcase", async (req, res) => {
   }
 });
 
+// GET all cases (Filtered by Lawyer)
 Userrouter.get("/getcases", async (req, res) => {
   try {
-    const cases = await caseModel.find({}).sort({ createdAt: -1 });
+    const { userId } = req.query;
+    const query = userId ? { createdBy: userId } : {};
+
+    const cases = await caseModel.find(query).sort({ createdAt: -1 });
     res.json({ cases });
   } catch (err) {
     console.error("Error fetching cases:", err);
@@ -223,9 +227,13 @@ Userrouter.get("/getcases", async (req, res) => {
   }
 });
 
+// GET all clients for the Add Case dropdown (Filtered by Lawyer)
 Userrouter.get("/getclients", async (req, res) => {
   try {
-    const clients = await clientModel.find({}).sort({ name: 1 });
+    const { userId } = req.query;
+    const query = userId ? { createdBy: userId } : {};
+
+    const clients = await clientModel.find(query).sort({ name: 1 });
     res.json({ clients });
   } catch (err) {
     console.error("Error fetching clients:", err);
